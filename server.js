@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { Pool } = require('pg');
 
 const app = express();
@@ -7,6 +8,14 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// Servir o frontend estático
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Redirecionar raiz para landing page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
 
 // Conexão com banco de dados
 const pool = new Pool({
