@@ -75,9 +75,38 @@
   </main>
 
   <script>
-    document.querySelector("#loginForm").addEventListener("submit", function (e) {
+    document.querySelector("#loginForm").addEventListener("submit", async function (e) {
       e.preventDefault();
-      window.location.href = "painel.html";
+      const btn = this.querySelector('button');
+      const email = this.querySelector('input[type="email"]').value;
+      const senha = this.querySelector('input[type="password"]').value;
+
+      btn.textContent = 'Entrando...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, senha })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.erro || 'Erro ao fazer login.');
+          btn.textContent = 'Entrar no painel →';
+          btn.disabled = false;
+          return;
+        }
+
+        localStorage.setItem('ta_token', data.token);
+        localStorage.setItem('ta_usuario', JSON.stringify(data.usuario));
+        window.location.href = 'painel.html';
+      } catch (err) {
+        alert('Erro de conexão. Tente novamente.');
+        btn.textContent = 'Entrar no painel →';
+        btn.disabled = false;
+      }
     });
   </script>
 </body>
