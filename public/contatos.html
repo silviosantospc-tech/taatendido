@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contatos - TáAtendido</title>
+  <meta name="description" content="Base de contatos do TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+      </div>
+
+      <nav class="nav-list">
+        <a class="nav-item" href="painel.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Painel
+        </a>
+        <a class="nav-item" href="index.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversas
+        </a>
+        <a class="nav-item is-active" href="contatos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contatos
+        </a>
+        <a class="nav-item" href="respostas.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Respostas rápidas
+        </a>
+        <a class="nav-item" href="empresa.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+      </nav>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Contatos</h1>
+          <p style="margin:4px 0 0;color:#64748b;font-size:0.9rem">6 contatos cadastrados</p>
+        </div>
+        <div class="top-actions">
+          <button class="primary-button" type="button" id="btnNovoContato">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            Novo contato
+          </button>
+        </div>
+      </header>
+
+      <section class="form-card wide-card">
+        <div class="form-head" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <h2>Base de contatos</h2>
+            <p>Clientes que entraram em contato pelo WhatsApp.</p>
+          </div>
+          <div class="search-box" style="width:260px">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="contatoSearch" type="search" placeholder="Buscar contato..." aria-label="Buscar contato">
+          </div>
+        </div>
+
+        <div class="filter-row" role="group" aria-label="Filtrar por status">
+          <button class="filter-chip is-active" type="button" data-filter="todos">Todos</button>
+          <button class="filter-chip" type="button" data-filter="em-atendimento">Em atendimento</button>
+          <button class="filter-chip" type="button" data-filter="aguardando">Aguardando</button>
+          <button class="filter-chip" type="button" data-filter="finalizado">Finalizados</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Contato</th>
+                <th>Telefone</th>
+                <th>Origem</th>
+                <th>Status</th>
+                <th>Último contato</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="contatosTbody">
+              <tr data-status="em-atendimento" data-nome="Maria Oliveira">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:linear-gradient(135deg,#2563eb,#22c55e)">MO</b>
+                    Maria Oliveira
+                  </span>
+                </td>
+                <td class="td-muted">(82) 99999-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-green">Em atendimento</span></td>
+                <td class="td-muted">Hoje, 09:42</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+              <tr data-status="aguardando" data-nome="João Santos">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:#22c55e">JS</b>
+                    João Santos
+                  </span>
+                </td>
+                <td class="td-muted">(82) 98888-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-amber">Aguardando</span></td>
+                <td class="td-muted">Hoje, 08:58</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+              <tr data-status="aberta" data-nome="Ana Paula">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:#7c3aed">AP</b>
+                    Ana Paula
+                  </span>
+                </td>
+                <td class="td-muted">(82) 97777-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-blue">Aberta</span></td>
+                <td class="td-muted">Ontem, 17:30</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+              <tr data-status="finalizado" data-nome="Ricardo Lima">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:#f97316">RL</b>
+                    Ricardo Lima
+                  </span>
+                </td>
+                <td class="td-muted">(82) 96666-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-muted">Finalizado</span></td>
+                <td class="td-muted">Ontem, 14:15</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+              <tr data-status="em-atendimento" data-nome="Carla Ferreira">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:#2563eb">CF</b>
+                    Carla Ferreira
+                  </span>
+                </td>
+                <td class="td-muted">(82) 95555-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-green">Em atendimento</span></td>
+                <td class="td-muted">Hoje, 10:05</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+              <tr data-status="finalizado" data-nome="Pousada Sol Mar">
+                <td>
+                  <span class="mini-contact">
+                    <b style="background:#22c55e">PS</b>
+                    Pousada Sol Mar
+                  </span>
+                </td>
+                <td class="td-muted">(82) 94444-0000</td>
+                <td class="td-muted">WhatsApp</td>
+                <td><span class="tag tag-muted">Finalizado</span></td>
+                <td class="td-muted">Hoje, 09:42</td>
+                <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Modal: Novo contato -->
+  <div class="modal-overlay" id="modalContato" role="dialog" aria-modal="true" aria-labelledby="modalTitulo" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2 id="modalTitulo">Novo contato</h2>
+        <button class="modal-close" id="btnFecharModal" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form class="settings-form" id="formNovoContato">
+        <label>
+          <span>Nome</span>
+          <input type="text" id="inputNome" placeholder="Ex: João Silva" required>
+        </label>
+        <label>
+          <span>Telefone</span>
+          <input type="tel" id="inputTelefone" placeholder="(82) 99999-0000" required>
+        </label>
+        <label>
+          <span>Origem</span>
+          <select id="inputOrigem">
+            <option>WhatsApp</option>
+            <option>Instagram</option>
+            <option>Site</option>
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select id="inputStatus">
+            <option value="aberta">Aberta</option>
+            <option value="em-atendimento">Em atendimento</option>
+            <option value="aguardando">Aguardando</option>
+            <option value="finalizado">Finalizado</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="btnCancelar">Cancelar</button>
+          <button type="submit" class="primary-button">Salvar contato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="contatos.js"></script>
+</body>
+</html>

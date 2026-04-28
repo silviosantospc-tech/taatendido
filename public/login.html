@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar - TáAtendido</title>
+  <meta name="description" content="Acesse o painel do TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <main class="login-shell">
+
+    <!-- ── Lado esquerdo: formulário ── -->
+    <section class="login-panel">
+      <div class="login-inner">
+        <a href="landing.html" class="brand">
+          <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+        </a>
+
+        <div class="login-copy">
+          <h1>Bem-vindo de volta.</h1>
+          <p>Entre para acompanhar seus atendimentos.</p>
+        </div>
+
+        <form class="login-form" id="loginForm">
+          <label>
+            <span>Email</span>
+            <input type="email" placeholder="seu@email.com.br" autocomplete="email" required>
+          </label>
+          <label>
+            <span>Senha</span>
+            <input type="password" placeholder="••••••••" autocomplete="current-password" required>
+          </label>
+          <button type="submit">Entrar no painel →</button>
+        </form>
+
+        <p class="login-signup">Não tem conta? <a href="landing.html#plano">Criar grátis</a></p>
+      </div>
+    </section>
+
+    <!-- ── Lado direito: destaque ── -->
+    <section class="summary-panel">
+      <div class="summary-inner">
+        <span class="summary-pill">WhatsApp primeiro</span>
+        <h2>Atendimento simples,<br>organizado e no<br>WhatsApp.</h2>
+        <ul class="summary-list">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Conversas organizadas em um painel
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Respostas rápidas para dúvidas frequentes
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Bot simples com passagem para humano
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Suporte via WhatsApp incluído
+          </li>
+        </ul>
+        <div class="summary-badge">
+          <span>🔒 SSL Ativo</span>
+          <span>🛡️ LGPD</span>
+          <span>☁️ Dados na nuvem</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    document.querySelector("#loginForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      window.location.href = "painel.html";
+    });
+  </script>
+</body>
+</html>

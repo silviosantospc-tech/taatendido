@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conversas - TáAtendido</title>
+  <meta name="description" content="Central de atendimento do TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+      </div>
+
+      <nav class="nav-list">
+        <a class="nav-item" href="painel.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Painel
+        </a>
+        <a class="nav-item is-active" href="index.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversas
+        </a>
+        <a class="nav-item" href="contatos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contatos
+        </a>
+        <a class="nav-item" href="respostas.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Respostas rápidas
+        </a>
+        <a class="nav-item" href="empresa.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+      </nav>
+
+      <section class="side-card" aria-label="Status do canal">
+        <div class="side-card-top">
+          <span class="status-dot"></span>
+          <strong>WhatsApp conectado</strong>
+        </div>
+        <p>Canal ativo do MVP. Outros canais entram nas próximas fases.</p>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Conversas</h1>
+          <p style="margin:4px 0 0;color:#64748b;font-size:0.9rem">12 abertas hoje</p>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" type="button" aria-label="Pesquisar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <a class="primary-button" href="painel.html">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            Novo atendimento
+          </a>
+        </div>
+      </header>
+
+      <div class="dashboard-grid">
+        <section class="inbox-panel" aria-label="Lista de conversas">
+          <div class="panel-head">
+            <div>
+              <h2>Conversas</h2>
+            </div>
+            <span class="count-pill">3 novas</span>
+          </div>
+
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="conversaSearch" type="search" placeholder="Buscar contato ou mensagem" aria-label="Buscar contato ou mensagem">
+          </div>
+
+          <div class="filter-row" role="group" aria-label="Filtros de conversa">
+            <button class="filter-chip is-active" type="button" data-filter="todas">Todas</button>
+            <button class="filter-chip" type="button" data-filter="aberta">Abertas</button>
+            <button class="filter-chip" type="button" data-filter="em-atendimento">Em atendimento</button>
+            <button class="filter-chip" type="button" data-filter="finalizada">Finalizadas</button>
+          </div>
+
+          <div class="conversation-list">
+            <button class="conversation-card is-active" type="button" data-contact="Pousada Sol Mar" data-status="em-atendimento">
+              <span class="avatar">PS</span>
+              <span class="conversation-main">
+                <strong>Pousada Sol Mar</strong>
+                <small>Quero saber a diária para casal...</small>
+              </span>
+              <span class="conversation-meta">
+                <time>09:42</time>
+                <b>2</b>
+              </span>
+            </button>
+
+            <button class="conversation-card" type="button" data-contact="Farmácia Central" data-status="aberta">
+              <span class="avatar green">FC</span>
+              <span class="conversation-main">
+                <strong>Farmácia Central</strong>
+                <small>Tem protetor solar fator 50?</small>
+              </span>
+              <span class="conversation-meta">
+                <time>09:31</time>
+              </span>
+            </button>
+
+            <button class="conversation-card" type="button" data-contact="Frigorífico Bom Corte" data-status="aberta">
+              <span class="avatar orange">BC</span>
+              <span class="conversation-main">
+                <strong>Frigorífico Bom Corte</strong>
+                <small>Pedido para entrega hoje à tarde.</small>
+              </span>
+              <span class="conversation-meta">
+                <time>08:58</time>
+              </span>
+            </button>
+
+            <button class="conversation-card" type="button" data-contact="Mercadinho Popular" data-status="aguardando">
+              <span class="avatar purple">MP</span>
+              <span class="conversation-main">
+                <strong>Mercadinho Popular</strong>
+                <small>Precisa confirmar forma de pagamento.</small>
+              </span>
+              <span class="conversation-meta">
+                <time>Ontem</time>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <section class="chat-panel" aria-label="Conversa selecionada">
+          <div class="chat-head">
+            <div class="contact-title">
+              <span class="avatar">PS</span>
+              <div>
+                <h2 id="activeContact">Pousada Sol Mar</h2>
+                <p id="chatStatus"><span class="status-dot"></span> Em atendimento · WhatsApp</p>
+              </div>
+            </div>
+            <div class="chat-actions">
+              <button class="icon-button" type="button" aria-label="Marcar conversa">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-3-6 3z"></path></svg>
+              </button>
+              <button class="secondary-button" type="button" id="btnFinalizar">Finalizar</button>
+            </div>
+          </div>
+
+          <div class="message-area" id="messageArea">
+            <div class="message received">
+              <p>Bom dia! Vocês têm quarto disponível para casal neste fim de semana?</p>
+              <time>09:39</time>
+            </div>
+            <div class="message sent bot">
+              <span>Bot</span>
+              <p>Bom dia! Temos sim. Você deseja consultar diária, localização ou fazer uma reserva?</p>
+              <time>09:39</time>
+            </div>
+            <div class="message received">
+              <p>Quero saber a diária e se tem café da manhã.</p>
+              <time>09:42</time>
+            </div>
+          </div>
+
+          <div class="quick-replies" aria-label="Respostas rápidas">
+            <button type="button" data-reply="Temos disponibilidade para o período informado. A diária para casal inclui café da manhã. Posso confirmar a data de entrada e saída?">Disponibilidade</button>
+            <button type="button" data-reply="Para reservar, preciso do seu nome completo, data de entrada, data de saída e quantidade de pessoas.">Reserva</button>
+            <button type="button" data-reply="Nossa localização é no centro, com fácil acesso. Posso enviar o endereço completo pelo WhatsApp.">Localização</button>
+          </div>
+
+          <form class="composer" id="composer">
+            <button class="icon-button" type="button" aria-label="Anexar arquivo">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 6.8-6.8a4 4 0 0 1 5.7 5.7l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5"></path></svg>
+            </button>
+            <input id="messageInput" type="text" placeholder="Digite uma resposta para o cliente" aria-label="Mensagem">
+            <button class="send-button" type="submit" aria-label="Enviar mensagem">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"></path></svg>
+            </button>
+          </form>
+        </section>
+
+        <aside class="details-panel" aria-label="Detalhes do atendimento">
+          <section class="contact-card">
+            <div class="large-avatar">PS</div>
+            <h2>Pousada Sol Mar</h2>
+            <p>Segmento: Pousada</p>
+            <span class="tag">Em atendimento</span>
+          </section>
+
+          <section class="info-section">
+            <h3>Dados do contato</h3>
+            <dl>
+              <div><dt>Telefone</dt><dd>(82) 99999-0000</dd></div>
+              <div><dt>Origem</dt><dd>WhatsApp</dd></div>
+              <div><dt>Responsável</dt><dd>Júlia</dd></div>
+            </dl>
+          </section>
+
+          <section class="info-section">
+            <h3>Automação</h3>
+            <label class="switch-row">
+              <span>Bot ativo</span>
+              <input type="checkbox" checked>
+            </label>
+            <label class="switch-row">
+              <span>Passar para humano</span>
+              <input type="checkbox">
+            </label>
+          </section>
+
+          <section class="info-section">
+            <h3>Próximas ações</h3>
+            <ul class="task-list">
+              <li>Confirmar datas</li>
+              <li>Enviar valores</li>
+              <li>Registrar interesse</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="toast.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

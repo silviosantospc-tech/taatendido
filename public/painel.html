@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel - TáAtendido</title>
+  <meta name="description" content="Painel de atendimento do TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+      </div>
+
+      <nav class="nav-list">
+        <a class="nav-item is-active" href="painel.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Painel
+        </a>
+        <a class="nav-item" href="index.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversas
+        </a>
+        <a class="nav-item" href="contatos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contatos
+        </a>
+        <a class="nav-item" href="respostas.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Respostas rápidas
+        </a>
+        <a class="nav-item" href="empresa.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+      </nav>
+
+      <section class="side-card" aria-label="Dica TáAtendido">
+        <div class="tip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <div class="side-card-top">
+          <strong>Dica TáAtendido</strong>
+        </div>
+        <p>Use respostas rápidas para atender mais em menos tempo.</p>
+        <a href="respostas.html">Saiba mais &rarr;</a>
+      </section>
+
+      <section class="plan-card" aria-label="Plano atual">
+        <strong>Plano Profissional</strong>
+        <span>Renova em 15/06/2025</span>
+        <div class="progress"><i></i></div>
+        <small>78% usado</small>
+      </section>
+    </aside>
+
+    <!-- Workspace -->
+    <section class="workspace">
+      <header class="topbar dashboard-topbar">
+        <div>
+          <h1>Painel de atendimento</h1>
+          <p>Visão geral do seu atendimento hoje.</p>
+        </div>
+        <div class="dashboard-header-actions">
+          <label class="global-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" placeholder="Buscar clientes, conversas..." aria-label="Buscar">
+            <kbd>⌘ K</kbd>
+          </label>
+          <button class="notify-button" type="button" aria-label="Notificações">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span>5</span>
+          </button>
+          <div class="user-menu">
+            <span class="user-avatar">RO</span>
+            <div>
+              <strong>Rafael Oliveira</strong>
+              <small>Administrador</small>
+            </div>
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px;fill:none;stroke:#94a3b8;stroke-width:2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+      </header>
+
+      <div class="dashboard-actions">
+        <span></span>
+        <div class="top-actions">
+          <a class="primary-button" href="index.html">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Novo atendimento
+          </a>
+        </div>
+      </div>
+
+      <!-- Métricas -->
+      <section class="metric-grid" aria-label="Indicadores de atendimento">
+        <article class="metric-card">
+          <span class="metric-icon blue">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+          </span>
+          <div>
+            <p>Atendimentos hoje</p>
+            <strong>128</strong>
+            <small class="positive">&#8593; 18% que ontem</small>
+          </div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-icon green">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <div>
+            <p>Conversas abertas</p>
+            <strong>37</strong>
+            <small class="positive">&#8593; 12% que ontem</small>
+          </div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-icon orange">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </span>
+          <div>
+            <p>Finalizados hoje</p>
+            <strong>94</strong>
+            <small class="positive">&#8593; 8% que ontem</small>
+          </div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-icon purple">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </span>
+          <div>
+            <p>Tempo médio de resposta</p>
+            <strong>4 min 12 s</strong>
+            <small class="positive">&#8595; 15% mais rápido</small>
+          </div>
+        </article>
+      </section>
+
+      <div class="overview-grid">
+
+        <!-- Gráfico -->
+        <section class="analytics-card big-analytics">
+          <div class="analytics-head">
+            <div>
+              <h2>Atendimentos na semana</h2>
+            </div>
+            <select aria-label="Período">
+              <option>Últimos 7 dias</option>
+              <option>Este mês</option>
+            </select>
+          </div>
+          <div class="chart-area" aria-label="Gráfico de atendimentos">
+            <div class="chart-wrap">
+              <div class="chart-bars">
+                <span style="--h: 58%"><b></b><em>Seg</em></span>
+                <span style="--h: 74%"><b></b><em>Ter</em></span>
+                <span style="--h: 52%"><b></b><em>Qua</em></span>
+                <span style="--h: 80%"><b></b><em>Qui</em></span>
+                <span style="--h: 63%"><b></b><em>Sex</em></span>
+                <span style="--h: 38%"><b></b><em>Sáb</em></span>
+                <span style="--h: 44%"><b></b><em>Dom</em></span>
+              </div>
+              <svg class="chart-line" viewBox="0 0 700 210" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.13"/>
+                    <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M50,88 L150,57 L250,99 L350,42 L450,78 L550,131 L650,118 L650,210 L50,210 Z" fill="url(#lineGrad)"/>
+                <polyline points="50,88 150,57 250,99 350,42 450,78 550,131 650,118" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="50"  cy="88"  r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="150" cy="57"  r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="250" cy="99"  r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="350" cy="42"  r="5" fill="#2563eb" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="450" cy="78"  r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="550" cy="131" r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+                <circle cx="650" cy="118" r="4" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <!-- Status das conversas -->
+        <section class="analytics-card">
+          <div class="analytics-head compact">
+            <h2>Status das conversas</h2>
+            <select aria-label="Período">
+              <option>Hoje</option>
+              <option>Esta semana</option>
+            </select>
+          </div>
+          <div class="funnel-list">
+            <div>
+              <span class="metric-icon blue">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <div class="funnel-info">
+                <strong>Abertas</strong>
+                <small>aguardando início</small>
+              </div>
+              <b>37</b>
+            </div>
+            <div>
+              <span class="metric-icon green">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+              </span>
+              <div class="funnel-info">
+                <strong>Em atendimento</strong>
+                <small>com um atendente</small>
+              </div>
+              <b>18</b>
+            </div>
+            <div>
+              <span class="metric-icon orange">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+              <div class="funnel-info">
+                <strong>Aguardando cliente</strong>
+                <small>resposta pendente</small>
+              </div>
+              <b>9</b>
+            </div>
+            <div>
+              <span class="metric-icon purple">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </span>
+              <div class="funnel-info">
+                <strong>Finalizadas</strong>
+                <small>encerradas hoje</small>
+              </div>
+              <b>64</b>
+            </div>
+          </div>
+        </section>
+
+        <!-- Conversas recentes -->
+        <section class="analytics-card big-analytics">
+          <div class="analytics-head compact">
+            <h2>Conversas recentes</h2>
+            <a href="index.html">Ver todas</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Canal</th>
+                  <th>Atendente</th>
+                  <th>Status</th>
+                  <th>Última interação</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="mini-contact"><b>MS</b>Maria Silva</span></td>
+                  <td>
+                    <span class="channel-name whatsapp">
+                      <svg class="ch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                      WhatsApp
+                    </span>
+                  </td>
+                  <td><span class="mini-contact"><b>J</b>Júlia</span></td>
+                  <td><span class="tag tag-green">Em atendimento</span></td>
+                  <td class="td-muted">2 min</td>
+                  <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+                </tr>
+                <tr>
+                  <td><span class="mini-contact"><b>JC</b>José Carlos</span></td>
+                  <td>
+                    <span class="channel-name whatsapp">
+                      <svg class="ch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                      WhatsApp
+                    </span>
+                  </td>
+                  <td><span class="mini-contact"><b>P</b>Pedro</span></td>
+                  <td><span class="tag tag-amber">Aguardando cliente</span></td>
+                  <td class="td-muted">8 min</td>
+                  <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+                </tr>
+                <tr>
+                  <td><span class="mini-contact"><b>AS</b>Ana Souza</span></td>
+                  <td>
+                    <span class="channel-name whatsapp">
+                      <svg class="ch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                      WhatsApp
+                    </span>
+                  </td>
+                  <td><span class="mini-contact"><b>C</b>Camila</span></td>
+                  <td><span class="tag tag-muted">Finalizado</span></td>
+                  <td class="td-muted">12 min</td>
+                  <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+                </tr>
+                <tr>
+                  <td><span class="mini-contact"><b>LC</b>Loja Central</span></td>
+                  <td>
+                    <span class="channel-name whatsapp">
+                      <svg class="ch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                      WhatsApp
+                    </span>
+                  </td>
+                  <td><span class="mini-contact"><b>M</b>Marcos</span></td>
+                  <td><span class="tag tag-blue">Aberta</span></td>
+                  <td class="td-muted">agora</td>
+                  <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Atendentes -->
+        <section class="analytics-card">
+          <div class="analytics-head compact">
+            <h2>Atendentes</h2>
+            <span class="tag tag-green" style="font-size:0.72rem">3 online</span>
+          </div>
+          <div class="agent-list">
+            <div class="agent-row">
+              <span class="avatar">J</span>
+              <div class="agent-info">
+                <strong>Júlia</strong>
+                <small>3 conversas ativas</small>
+              </div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="agent-row">
+              <span class="avatar green">P</span>
+              <div class="agent-info">
+                <strong>Pedro</strong>
+                <small>5 conversas ativas</small>
+              </div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="agent-row">
+              <span class="avatar orange">C</span>
+              <div class="agent-info">
+                <strong>Camila</strong>
+                <small>2 conversas ativas</small>
+              </div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="agent-row">
+              <span class="avatar purple">M</span>
+              <div class="agent-info">
+                <strong>Marcos</strong>
+                <small>ausente</small>
+              </div>
+              <span class="status-dot offline"></span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </section>
+  </main>
+</body>
+</html>

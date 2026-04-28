@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Empresa - TáAtendido</title>
+  <meta name="description" content="Configuração visual da empresa no TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+      </div>
+
+      <nav class="nav-list">
+        <a class="nav-item" href="painel.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Painel
+        </a>
+        <a class="nav-item" href="index.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversas
+        </a>
+        <a class="nav-item" href="contatos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contatos
+        </a>
+        <a class="nav-item" href="respostas.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Respostas rápidas
+        </a>
+        <a class="nav-item is-active" href="empresa.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+      </nav>
+
+      <section class="side-card" aria-label="Dica">
+        <div class="side-card-top">
+          <span class="status-dot"></span>
+          <strong>Configurações</strong>
+        </div>
+        <p>Personalize as mensagens automáticas e os horários do seu negócio aqui.</p>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Configurações</h1>
+        </div>
+        <div class="top-actions">
+          <a class="secondary-button" href="painel.html">Voltar ao painel</a>
+          <button class="primary-button" type="button" id="btnSalvarVisual">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"></path></svg>
+            Salvar visual
+          </button>
+        </div>
+      </header>
+
+      <div class="settings-layout">
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Dados principais</h2>
+            <p>Essas informações identificam o negócio dentro do TáAtendido.</p>
+          </div>
+          <form class="settings-form">
+            <label>
+              <span>Nome da empresa</span>
+              <input type="text" value="Pousada Sol Mar">
+            </label>
+            <label>
+              <span>Segmento</span>
+              <select>
+                <option>Pousada / Hotel</option>
+                <option>Farmácia</option>
+                <option>Açougue / Frigorífico</option>
+                <option>Mercado / Mercearia</option>
+                <option>Restaurante / Lanchonete</option>
+                <option>Loja em geral</option>
+                <option>Salão de beleza</option>
+                <option>Clínica / Consultório</option>
+                <option>Prestador de serviços</option>
+                <option>Outro</option>
+              </select>
+            </label>
+            <label>
+              <span>WhatsApp principal</span>
+              <input type="text" value="(82) 99999-0000">
+            </label>
+            <label>
+              <span>Email</span>
+              <input type="email" value="contato@pousadasolmar.com.br">
+            </label>
+          </form>
+        </section>
+
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Mensagens automáticas</h2>
+            <p>Textos usados pelo bot simples na primeira abordagem.</p>
+          </div>
+          <form class="settings-form one-column">
+            <label>
+              <span>Saudação</span>
+              <textarea>Olá! Seja bem-vindo ao atendimento da Pousada Sol Mar. Como podemos ajudar?</textarea>
+            </label>
+            <label>
+              <span>Fora do horário</span>
+              <textarea>No momento estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.</textarea>
+            </label>
+            <label>
+              <span>Quando não souber responder</span>
+              <textarea>Vou chamar um atendente para ajudar você com mais detalhes.</textarea>
+            </label>
+          </form>
+        </section>
+
+        <section class="form-card" id="horarios">
+          <div class="form-head">
+            <h2>Horários de atendimento</h2>
+            <p>Base visual para controlar mensagens de ausência e atendimento humano.</p>
+          </div>
+          <div class="schedule-grid">
+            <div><strong>Segunda a sexta</strong><span>08:00 às 18:00</span></div>
+            <div><strong>Sábado</strong><span>08:00 às 12:00</span></div>
+            <div><strong>Domingo</strong><span>Fechado</span></div>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Automação</h2>
+            <p>Controles iniciais para decidir quando o bot deve atuar.</p>
+          </div>
+          <div class="automation-list">
+            <label class="switch-row">
+              <span>Responder saudação automaticamente</span>
+              <input type="checkbox" checked>
+            </label>
+            <label class="switch-row">
+              <span>Enviar mensagem fora do horário</span>
+              <input type="checkbox" checked>
+            </label>
+            <label class="switch-row">
+              <span>Encaminhar dúvidas difíceis para humano</span>
+              <input type="checkbox" checked>
+            </label>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script src="toast.js"></script>
+  <script src="empresa.js"></script>
+</body>
+</html>

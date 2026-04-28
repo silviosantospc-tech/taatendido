@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Respostas rápidas - TáAtendido</title>
+  <meta name="description" content="Respostas rápidas do protótipo TáAtendido.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+      </div>
+
+      <nav class="nav-list">
+        <a class="nav-item" href="painel.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Painel
+        </a>
+        <a class="nav-item" href="index.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversas
+        </a>
+        <a class="nav-item" href="contatos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contatos
+        </a>
+        <a class="nav-item is-active" href="respostas.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Respostas rápidas
+        </a>
+        <a class="nav-item" href="empresa.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+      </nav>
+
+      <section class="side-card" aria-label="Dica">
+        <div class="side-card-top">
+          <span class="status-dot"></span>
+          <strong>Dica</strong>
+        </div>
+        <p>Respostas prontas agilizam o atendimento sem perder o toque humano.</p>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Respostas rápidas</h1>
+        </div>
+        <div class="top-actions">
+          <a class="secondary-button" href="painel.html">Voltar ao painel</a>
+          <button class="primary-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            Nova resposta
+          </button>
+        </div>
+      </header>
+
+      <div class="settings-layout">
+        <section class="form-card wide-card">
+          <div class="form-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+            <div>
+              <h2>Biblioteca da empresa</h2>
+              <p>Exemplos de respostas que podem ser usadas pelo atendente ou pelo bot simples.</p>
+            </div>
+            <div class="search-box" style="width:220px;flex-shrink:0">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="respostasSearch" type="search" placeholder="Buscar resposta..." aria-label="Buscar resposta">
+            </div>
+          </div>
+          <div class="reply-list">
+            <article class="reply-card">
+              <span class="tag">Reservas</span>
+              <h3>Disponibilidade</h3>
+              <p>Temos disponibilidade para o período informado. A diária para casal inclui café da manhã. Posso confirmar a data de entrada e saída?</p>
+            </article>
+            <article class="reply-card">
+              <span class="tag">Pedidos</span>
+              <h3>Dados para pedido</h3>
+              <p>Para seguir com seu pedido, informe nome, endereço de entrega, forma de pagamento e os itens desejados.</p>
+            </article>
+            <article class="reply-card">
+              <span class="tag">Localização</span>
+              <h3>Endereço</h3>
+              <p>Nossa localização é no centro, com fácil acesso. Posso enviar o endereço completo e ponto de referência.</p>
+            </article>
+            <article class="reply-card">
+              <span class="tag">Humano</span>
+              <h3>Chamar atendente</h3>
+              <p>Vou chamar um atendente para continuar seu atendimento e ajudar com mais detalhes.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Criar resposta</h2>
+            <p>Formulário visual para a próxima fase funcional.</p>
+          </div>
+          <form class="settings-form one-column">
+            <label>
+              <span>Título</span>
+              <input id="inputTituloResposta" type="text" placeholder="Ex: Horário de funcionamento">
+            </label>
+            <label>
+              <span>Categoria</span>
+              <select id="inputCategoria">
+                <option>Atendimento</option>
+                <option>Reservas</option>
+                <option>Pedidos</option>
+                <option>Localização</option>
+                <option>Pagamento</option>
+              </select>
+            </label>
+            <label>
+              <span>Mensagem</span>
+              <textarea id="inputMensagem" placeholder="Digite a resposta pronta que será usada no atendimento."></textarea>
+            </label>
+            <button class="primary-button full-button" type="button" id="btnSalvarResposta">Salvar resposta</button>
+          </form>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script src="toast.js"></script>
+  <script src="respostas.js"></script>
+</body>
+</html>

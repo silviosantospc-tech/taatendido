@@ -1,0 +1,215 @@
+:root {
+  --text: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --accent: #2563eb;
+  --green: #22c55e;
+  --green-strong: #16a34a;
+  --navy: #1e3a5f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { text-decoration: none; color: inherit; }
+
+/* ── Shell ── */
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ── Painel esquerdo ── */
+.login-panel {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  border-right: 1px solid var(--line);
+}
+
+.login-inner {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand { margin-bottom: 48px; display: inline-flex; }
+.brand-logo { height: 40px; }
+
+.login-copy { margin-bottom: 32px; }
+
+.login-copy h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.login-copy p {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ── Formulário ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.login-form input {
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: #fafafa;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-form input:focus {
+  border-color: var(--green);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+}
+
+.login-form button {
+  margin-top: 4px;
+  height: 52px;
+  border: none;
+  border-radius: 10px;
+  background: var(--green);
+  color: #fff;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(34,197,94,0.3);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.login-form button:hover {
+  background: var(--green-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+}
+
+.login-signup {
+  margin-top: 20px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.login-signup a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.login-signup a:hover { text-decoration: underline; }
+
+/* ── Painel direito ── */
+.summary-panel {
+  background: var(--navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 48px;
+}
+
+.summary-inner {
+  max-width: 420px;
+  width: 100%;
+}
+
+.summary-pill {
+  display: inline-block;
+  background: rgba(34,197,94,0.2);
+  color: #4ade80;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(34,197,94,0.3);
+  margin-bottom: 24px;
+}
+
+.summary-inner h2 {
+  color: #fff;
+  font-size: clamp(1.6rem, 2.5vw, 2.1rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  margin-bottom: 32px;
+}
+
+.summary-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 40px;
+}
+
+.summary-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.summary-list svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: #4ade80;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.summary-badge {
+  display: flex;
+  gap: 16px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.summary-badge span {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.45);
+  font-weight: 500;
+}
+
+/* ── Responsivo ── */
+@media (max-width: 768px) {
+  .login-shell { grid-template-columns: 1fr; }
+  .summary-panel { display: none; }
+  .login-panel { border-right: none; }
+}
