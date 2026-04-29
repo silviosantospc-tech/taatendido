@@ -4,15 +4,40 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'taatendido_secret_2025';
 
-app.use(cors());
-app.use(express.json());
+// ── JWT Secret obrigatório ────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('ERRO CRÍTICO: JWT_SECRET não definido. Defina a variável de ambiente antes de iniciar.');
+  process.exit(1);
+}
 
-// Redirecionar HTTP → HTTPS em produção
+// ── CORS: apenas domínios autorizados ────────────────────
+const origensPermitidas = [
+  'https://taatendido.com.br',
+  'https://www.taatendido.com.br',
+  'http://localhost:3000',
+  'http://localhost:5500',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origensPermitidas.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Origem não permitida pelo CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json({ limit: '20kb' }));
+
+// ── Redirecionar HTTP → HTTPS em produção ────────────────
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] === 'http') {
     return res.redirect(301, 'https://' + req.headers.host + req.url);
@@ -20,17 +45,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// Raiz → landing page
+// ── Rate limiting: auth (anti brute-force) ───────────────
+const limiterAuth = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10,                   // máximo 10 tentativas por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas tentativas. Aguarde 15 minutos e tente novamente.' },
+});
+
+// ── Rate limiting: geral ──────────────────────────────────
+const limiterGeral = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas requisições. Tente novamente em instantes.' },
+});
+
+app.use('/api/', limiterGeral);
+app.use('/api/auth/login', limiterAuth);
+app.use('/api/auth/registro', limiterAuth);
+
+// ── Raiz → landing page ───────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
-// Servir o frontend estático
+// ── Servir o frontend estático ────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Conexão com banco de dados
+// ── Conexão com banco de dados ────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
 // ── Middleware de autenticação ────────────────────────────
@@ -45,7 +93,7 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// ── Health check ─────────────────────────────────────────
+// ── Health check ──────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'TáAtendido API', timestamp: new Date().toISOString() });
 });
@@ -99,22 +147,50 @@ async function initDB() {
   console.log('Banco de dados inicializado com sucesso.');
 }
 
+// ── Helpers ───────────────────────────────────────────────
+function erroInterno(res, err) {
+  console.error(err);
+  res.status(500).json({ erro: 'Erro interno. Tente novamente.' });
+}
+
+function validarEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 // ── Auth: Registro ────────────────────────────────────────
 app.post('/api/auth/registro', async (req, res) => {
   try {
     const { nome, email, senha } = req.body;
-    if (!nome || !email || !senha) return res.status(400).json({ erro: 'Preencha todos os campos.' });
-    const existe = await pool.query('SELECT id FROM usuarios WHERE email=$1', [email]);
+
+    if (!nome || !email || !senha)
+      return res.status(400).json({ erro: 'Preencha todos os campos.' });
+
+    if (!validarEmail(email))
+      return res.status(400).json({ erro: 'Email inválido.' });
+
+    if (senha.length < 6)
+      return res.status(400).json({ erro: 'A senha deve ter pelo menos 6 caracteres.' });
+
+    if (nome.length > 100 || email.length > 150)
+      return res.status(400).json({ erro: 'Dados inválidos.' });
+
+    const existe = await pool.query('SELECT id FROM usuarios WHERE email=$1', [email.toLowerCase()]);
     if (existe.rows.length) return res.status(409).json({ erro: 'Email já cadastrado.' });
-    const senha_hash = await bcrypt.hash(senha, 10);
+
+    const senha_hash = await bcrypt.hash(senha, 12);
     const { rows } = await pool.query(
       'INSERT INTO usuarios (nome, email, senha_hash) VALUES ($1, $2, $3) RETURNING id, nome, email, papel',
-      [nome, email, senha_hash]
+      [nome.trim(), email.toLowerCase(), senha_hash]
     );
-    const token = jwt.sign({ id: rows[0].id, email: rows[0].email, papel: rows[0].papel }, JWT_SECRET, { expiresIn: '7d' });
+
+    const token = jwt.sign(
+      { id: rows[0].id, email: rows[0].email, papel: rows[0].papel },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
     res.status(201).json({ token, usuario: rows[0] });
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -122,15 +198,31 @@ app.post('/api/auth/registro', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, senha } = req.body;
-    if (!email || !senha) return res.status(400).json({ erro: 'Preencha email e senha.' });
-    const { rows } = await pool.query('SELECT * FROM usuarios WHERE email=$1', [email]);
-    if (!rows.length) return res.status(401).json({ erro: 'Email ou senha incorretos.' });
-    const valido = await bcrypt.compare(senha, rows[0].senha_hash);
-    if (!valido) return res.status(401).json({ erro: 'Email ou senha incorretos.' });
-    const token = jwt.sign({ id: rows[0].id, email: rows[0].email, papel: rows[0].papel }, JWT_SECRET, { expiresIn: '7d' });
+
+    if (!email || !senha)
+      return res.status(400).json({ erro: 'Preencha email e senha.' });
+
+    if (!validarEmail(email))
+      return res.status(400).json({ erro: 'Email inválido.' });
+
+    const { rows } = await pool.query('SELECT * FROM usuarios WHERE email=$1', [email.toLowerCase()]);
+
+    // Mesmo tempo de resposta se o usuário não existir (evita user enumeration)
+    const dummy = '$2b$12$invalido.hash.para.comparacao.segura.evitar.timing';
+    const hash = rows.length ? rows[0].senha_hash : dummy;
+    const valido = await bcrypt.compare(senha, hash);
+
+    if (!rows.length || !valido)
+      return res.status(401).json({ erro: 'Email ou senha incorretos.' });
+
+    const token = jwt.sign(
+      { id: rows[0].id, email: rows[0].email, papel: rows[0].papel },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
     res.json({ token, usuario: { id: rows[0].id, nome: rows[0].nome, email: rows[0].email, papel: rows[0].papel } });
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -138,9 +230,10 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, nome, email, papel FROM usuarios WHERE id=$1', [req.usuario.id]);
+    if (!rows.length) return res.status(404).json({ erro: 'Usuário não encontrado.' });
     res.json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -150,20 +243,21 @@ app.get('/api/contatos', authMiddleware, async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM contatos ORDER BY criado_em DESC');
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.post('/api/contatos', authMiddleware, async (req, res) => {
   try {
     const { nome, telefone, segmento } = req.body;
+    if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
     const { rows } = await pool.query(
       'INSERT INTO contatos (nome, telefone, segmento) VALUES ($1, $2, $3) RETURNING *',
-      [nome, telefone, segmento]
+      [nome.trim(), telefone?.trim(), segmento?.trim()]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -178,33 +272,39 @@ app.get('/api/conversas', authMiddleware, async (req, res) => {
     `);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.post('/api/conversas', authMiddleware, async (req, res) => {
   try {
     const { contato_id, canal } = req.body;
+    if (!contato_id) return res.status(400).json({ erro: 'contato_id é obrigatório.' });
     const { rows } = await pool.query(
       'INSERT INTO conversas (contato_id, canal) VALUES ($1, $2) RETURNING *',
       [contato_id, canal || 'whatsapp']
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.patch('/api/conversas/:id/status', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
+    const statusValidos = ['aberta', 'em-atendimento', 'aguardando', 'finalizada'];
+    if (!statusValidos.includes(status))
+      return res.status(400).json({ erro: 'Status inválido.' });
+
     const { rows } = await pool.query(
       'UPDATE conversas SET status=$1, atualizado_em=NOW() WHERE id=$2 RETURNING *',
       [status, req.params.id]
     );
+    if (!rows.length) return res.status(404).json({ erro: 'Conversa não encontrada.' });
     res.json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -217,21 +317,25 @@ app.get('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.post('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
   try {
     const { tipo, conteudo } = req.body;
+    if (!conteudo?.trim()) return res.status(400).json({ erro: 'Conteúdo é obrigatório.' });
+    const tiposValidos = ['received', 'sent'];
+    const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'received';
+
     const { rows } = await pool.query(
       'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1, $2, $3) RETURNING *',
-      [req.params.id, tipo || 'received', conteudo]
+      [req.params.id, tipoFinal, conteudo.trim()]
     );
     await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [req.params.id]);
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
@@ -241,30 +345,37 @@ app.get('/api/respostas', authMiddleware, async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM respostas_rapidas ORDER BY criado_em DESC');
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.post('/api/respostas', authMiddleware, async (req, res) => {
   try {
     const { titulo, categoria, mensagem } = req.body;
+    if (!titulo || !mensagem) return res.status(400).json({ erro: 'Título e mensagem são obrigatórios.' });
     const { rows } = await pool.query(
       'INSERT INTO respostas_rapidas (titulo, categoria, mensagem) VALUES ($1, $2, $3) RETURNING *',
-      [titulo, categoria, mensagem]
+      [titulo.trim(), categoria?.trim(), mensagem.trim()]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
 });
 
 app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
   try {
-    await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [req.params.id]);
+    const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [req.params.id]);
+    if (result.rowCount === 0) return res.status(404).json({ erro: 'Resposta não encontrada.' });
     res.json({ mensagem: 'Resposta removida.' });
   } catch (err) {
-    res.status(500).json({ erro: err.message });
+    erroInterno(res, err);
   }
+});
+
+// ── Rota não encontrada ───────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ erro: 'Rota não encontrada.' });
 });
 
 // ── Iniciar servidor ──────────────────────────────────────
