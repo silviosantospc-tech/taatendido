@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Criar conta - TáAtendido</title>
+  <meta name="description" content="Crie sua conta no TáAtendido e comece a atender pelo WhatsApp.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <main class="login-shell">
+
+    <!-- ── Lado esquerdo: formulário ── -->
+    <section class="login-panel">
+      <div class="login-inner">
+        <a href="landing.html" class="brand">
+          <img src="assets/Táatendido.png" alt="TáAtendido" class="brand-logo">
+        </a>
+
+        <div class="login-copy">
+          <h1>Crie sua conta.</h1>
+          <p>Comece a atender seus clientes pelo WhatsApp agora mesmo.</p>
+        </div>
+
+        <form class="login-form" id="registroForm">
+          <label>
+            <span>Nome completo</span>
+            <input type="text" id="inputNome" placeholder="Seu nome" autocomplete="name" required>
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" id="inputEmail" placeholder="seu@email.com.br" autocomplete="email" required>
+          </label>
+          <label>
+            <span>Senha</span>
+            <input type="password" id="inputSenha" placeholder="••••••••" autocomplete="new-password" required>
+          </label>
+          <label>
+            <span>Confirmar senha</span>
+            <input type="password" id="inputConfirmar" placeholder="••••••••" autocomplete="new-password" required>
+          </label>
+          <div id="erroMsg" style="display:none;color:#ef4444;font-size:0.88rem;font-weight:500;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;"></div>
+          <button type="submit">Criar conta grátis →</button>
+        </form>
+
+        <p class="login-signup">Já tem conta? <a href="login.html">Entrar</a></p>
+      </div>
+    </section>
+
+    <!-- ── Lado direito: destaque ── -->
+    <section class="summary-panel">
+      <div class="summary-inner">
+        <span class="summary-pill">Grátis para começar</span>
+        <h2>Tudo que você precisa<br>para atender bem<br>pelo WhatsApp.</h2>
+        <ul class="summary-list">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Painel de conversas em tempo real
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Respostas rápidas para agilizar o atendimento
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Cadastro de contatos e histórico completo
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Suporte via WhatsApp incluído
+          </li>
+        </ul>
+        <div class="summary-badge">
+          <span>🔒 SSL Ativo</span>
+          <span>🛡️ LGPD</span>
+          <span>☁️ Dados na nuvem</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    document.querySelector("#registroForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const btn = this.querySelector('button');
+      const erroMsg = document.getElementById('erroMsg');
+      const nome = document.getElementById('inputNome').value.trim();
+      const email = document.getElementById('inputEmail').value.trim();
+      const senha = document.getElementById('inputSenha').value;
+      const confirmar = document.getElementById('inputConfirmar').value;
+
+      erroMsg.style.display = 'none';
+
+      if (senha !== confirmar) {
+        erroMsg.textContent = 'As senhas não coincidem.';
+        erroMsg.style.display = 'block';
+        return;
+      }
+
+      if (senha.length < 6) {
+        erroMsg.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+        erroMsg.style.display = 'block';
+        return;
+      }
+
+      btn.textContent = 'Criando conta...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/registro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, email, senha })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          erroMsg.textContent = data.erro || 'Erro ao criar conta.';
+          erroMsg.style.display = 'block';
+          btn.textContent = 'Criar conta grátis →';
+          btn.disabled = false;
+          return;
+        }
+
+        localStorage.setItem('ta_token', data.token);
+        localStorage.setItem('ta_usuario', JSON.stringify(data.usuario));
+        window.location.href = 'painel.html';
+      } catch (err) {
+        erroMsg.textContent = 'Erro de conexão. Tente novamente.';
+        erroMsg.style.display = 'block';
+        btn.textContent = 'Criar conta grátis →';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
