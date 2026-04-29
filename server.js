@@ -12,6 +12,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'taatendido_secret_2025';
 app.use(cors());
 app.use(express.json());
 
+// Redirecionar HTTP → HTTPS em produção
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] === 'http') {
+    return res.redirect(301, 'https://' + req.headers.host + req.url);
+  }
+  next();
+});
+
 // Raiz → landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
