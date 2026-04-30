@@ -32,7 +32,12 @@
           </label>
           <label>
             <span>Senha</span>
-            <input type="password" placeholder="••••••••" autocomplete="current-password" required>
+            <div class="input-eye">
+              <input id="inputSenhaLogin" type="password" placeholder="••••••••" autocomplete="current-password" required>
+              <button type="button" class="eye-btn" onclick="toggleSenha('inputSenhaLogin',this)" aria-label="Mostrar senha">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </label>
           <button type="submit">Entrar no painel →</button>
         </form>
@@ -75,11 +80,19 @@
   </main>
 
   <script>
+    function toggleSenha(id, btn) {
+      const input = document.getElementById(id);
+      const mostrar = input.type === 'password';
+      input.type = mostrar ? 'text' : 'password';
+      btn.style.color = mostrar ? '#22c55e' : '';
+    }
+  </script>
+  <script>
     document.querySelector("#loginForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       const btn = this.querySelector('button');
       const email = this.querySelector('input[type="email"]').value;
-      const senha = this.querySelector('input[type="password"]').value;
+      const senha = document.getElementById('inputSenhaLogin').value;
 
       btn.textContent = 'Entrando...';
       btn.disabled = true;

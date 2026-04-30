@@ -100,10 +100,10 @@
         <section class="chat-panel" aria-label="Conversa selecionada">
           <div class="chat-head">
             <div class="contact-title">
-              <span class="avatar">PS</span>
+              <span class="avatar" id="activeAvatar">—</span>
               <div>
-                <h2 id="activeContact">Pousada Sol Mar</h2>
-                <p id="chatStatus"><span class="status-dot"></span> Em atendimento · WhatsApp</p>
+                <h2 id="activeContact">Selecione uma conversa</h2>
+                <p id="chatStatus" style="color:#94a3b8">Nenhuma conversa selecionada</p>
               </div>
             </div>
             <div class="chat-actions">
@@ -136,40 +136,17 @@
 
         <aside class="details-panel" aria-label="Detalhes do atendimento">
           <section class="contact-card">
-            <div class="large-avatar">PS</div>
-            <h2>Pousada Sol Mar</h2>
-            <p>Segmento: Pousada</p>
-            <span class="tag">Em atendimento</span>
+            <div class="large-avatar" id="detailAvatar">—</div>
+            <h2 id="detailNome">Nenhuma conversa</h2>
+            <p id="detailSegmento" style="color:#94a3b8">Selecione uma conversa ao lado</p>
           </section>
 
-          <section class="info-section">
+          <section class="info-section" id="detailInfo" style="display:none">
             <h3>Dados do contato</h3>
             <dl>
-              <div><dt>Telefone</dt><dd>(82) 99999-0000</dd></div>
-              <div><dt>Origem</dt><dd>WhatsApp</dd></div>
-              <div><dt>Responsável</dt><dd>Júlia</dd></div>
+              <div><dt>Telefone</dt><dd id="detailTelefone">—</dd></div>
+              <div><dt>Canal</dt><dd>WhatsApp</dd></div>
             </dl>
-          </section>
-
-          <section class="info-section">
-            <h3>Automação</h3>
-            <label class="switch-row">
-              <span>Bot ativo</span>
-              <input type="checkbox" checked>
-            </label>
-            <label class="switch-row">
-              <span>Passar para humano</span>
-              <input type="checkbox">
-            </label>
-          </section>
-
-          <section class="info-section">
-            <h3>Próximas ações</h3>
-            <ul class="task-list">
-              <li>Confirmar datas</li>
-              <li>Enviar valores</li>
-              <li>Registrar interesse</li>
-            </ul>
           </section>
         </aside>
       </div>

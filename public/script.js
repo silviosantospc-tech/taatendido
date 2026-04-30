@@ -81,16 +81,34 @@ async function selecionarConversa(conversa, cardEl) {
   document.querySelectorAll('.conversation-card').forEach(c => c.classList.remove('is-active'));
   cardEl.classList.add('is-active');
 
-  activeContact.textContent = conversa.contato_nome || 'Desconhecido';
+  const nome = conversa.contato_nome || 'Desconhecido';
+  const ini  = iniciais(nome);
+
+  // Cabeçalho do chat
+  activeContact.textContent = nome;
+  const avatar = document.getElementById('activeAvatar');
+  if (avatar) avatar.textContent = ini;
 
   const finalizada = conversa.status === 'finalizada';
   chatStatus.innerHTML = finalizada
     ? `<span class="status-dot" style="background:#cbd5e1;box-shadow:none"></span> Finalizada · WhatsApp`
     : `<span class="status-dot"></span> Em atendimento · WhatsApp`;
+  chatStatus.style.color = '';
 
-  if (btnFinalizar) {
-    btnFinalizar.textContent = finalizada ? 'Reabrir' : 'Finalizar';
-  }
+  if (btnFinalizar) btnFinalizar.textContent = finalizada ? 'Reabrir' : 'Finalizar';
+
+  // Painel de detalhes
+  const detailAvatar   = document.getElementById('detailAvatar');
+  const detailNome     = document.getElementById('detailNome');
+  const detailSegmento = document.getElementById('detailSegmento');
+  const detailTelefone = document.getElementById('detailTelefone');
+  const detailInfo     = document.getElementById('detailInfo');
+
+  if (detailAvatar)   detailAvatar.textContent   = ini;
+  if (detailNome)     detailNome.textContent      = nome;
+  if (detailSegmento) { detailSegmento.textContent = conversa.canal || 'WhatsApp'; detailSegmento.style.color = ''; }
+  if (detailTelefone) detailTelefone.textContent  = conversa.contato_telefone || '—';
+  if (detailInfo)     detailInfo.style.display    = '';
 
   await carregarMensagens(conversa.id);
 }

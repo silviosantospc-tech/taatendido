@@ -36,11 +36,21 @@
           </label>
           <label>
             <span>Senha</span>
-            <input type="password" id="inputSenha" placeholder="••••••••" autocomplete="new-password" required>
+            <div class="input-eye">
+              <input type="password" id="inputSenha" placeholder="••••••••" autocomplete="new-password" required>
+              <button type="button" class="eye-btn" onclick="toggleSenha('inputSenha',this)" aria-label="Mostrar senha">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </label>
           <label>
             <span>Confirmar senha</span>
-            <input type="password" id="inputConfirmar" placeholder="••••••••" autocomplete="new-password" required>
+            <div class="input-eye">
+              <input type="password" id="inputConfirmar" placeholder="••••••••" autocomplete="new-password" required>
+              <button type="button" class="eye-btn" onclick="toggleSenha('inputConfirmar',this)" aria-label="Mostrar senha">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </label>
           <div id="erroMsg" style="display:none;color:#ef4444;font-size:0.88rem;font-weight:500;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;"></div>
           <button type="submit">Criar conta grátis →</button>
@@ -83,6 +93,14 @@
 
   </main>
 
+  <script>
+    function toggleSenha(id, btn) {
+      const input = document.getElementById(id);
+      const mostrar = input.type === 'password';
+      input.type = mostrar ? 'text' : 'password';
+      btn.style.color = mostrar ? '#22c55e' : '';
+    }
+  </script>
   <script>
     document.querySelector("#registroForm").addEventListener("submit", async function (e) {
       e.preventDefault();
