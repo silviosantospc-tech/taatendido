@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,21 @@ const origensPermitidas = [
 ];
 // Necessário para rate-limit funcionar corretamente atrás do Traefik
 app.set('trust proxy', 1);
+
+// ── Segurança: headers HTTP ───────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      styleSrc:   ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "fonts.gstatic.com"],
+      fontSrc:    ["'self'", "fonts.gstatic.com"],
+      imgSrc:     ["'self'", "data:", "i.pravatar.cc"],
+      connectSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
 app.use(cors({
   origin: (origin, callback) => {
