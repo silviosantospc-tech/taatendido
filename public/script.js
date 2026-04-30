@@ -1,159 +1,232 @@
-/* ── Conversas: troca de conversa ──────────────────────── */
-const conversationButtons = document.querySelectorAll(".conversation-card");
-const activeContact = document.querySelector("#activeContact");
-const messageArea = document.querySelector("#messageArea");
-const composer = document.querySelector("#composer");
-const messageInput = document.querySelector("#messageInput");
-const quickReplies = document.querySelectorAll(".quick-replies button");
+/* ── Conversas: API + UI ────────────────────────────────── */
 
-const sampleMessages = {
-  "Pousada Sol Mar": [
-    ["received", "Bom dia! Vocês têm quarto disponível para casal neste fim de semana?"],
-    ["sent bot", "Bom dia! Temos sim. Você deseja consultar diária, localização ou fazer uma reserva?"],
-    ["received", "Quero saber a diária e se tem café da manhã."]
-  ],
-  "Farmácia Central": [
-    ["received", "Boa tarde. Tem protetor solar fator 50?"],
-    ["sent bot", "Boa tarde! Vou consultar os produtos disponíveis para você."],
-    ["received", "Se tiver, quero saber se entrega no centro."]
-  ],
-  "Frigorífico Bom Corte": [
-    ["received", "Bom dia. Quero fazer um pedido para entrega hoje."],
-    ["sent bot", "Bom dia! Pode me informar os cortes e a quantidade desejada?"],
-    ["received", "Quero 3kg de alcatra e 2kg de carne moída."]
-  ],
-  "Mercadinho Popular": [
-    ["received", "Vocês aceitam pix na entrega?"],
-    ["sent bot", "Aceitamos pix, dinheiro e cartão. Deseja montar um pedido?"],
-    ["received", "Sim, quero ver as promoções de hoje."]
-  ]
-};
+let conversaAtiva = null;
 
-function renderMessages(contactName) {
-  const messages = sampleMessages[contactName] || [];
-  messageArea.innerHTML = "";
+const conversationList = document.querySelector('.conversation-list');
+const messageArea      = document.querySelector('#messageArea');
+const activeContact    = document.querySelector('#activeContact');
+const chatStatus       = document.querySelector('#chatStatus');
+const messageInput     = document.querySelector('#messageInput');
+const composer         = document.querySelector('#composer');
+const btnFinalizar     = document.querySelector('#btnFinalizar');
+const quickReplies     = document.querySelectorAll('.quick-replies button');
 
-  messages.forEach(([type, text], index) => {
-    const message = document.createElement("div");
-    message.className = `message ${type}`;
-
-    if (type.includes("bot")) {
-      const label = document.createElement("span");
-      label.textContent = "Bot";
-      message.appendChild(label);
-    }
-
-    const paragraph = document.createElement("p");
-    paragraph.textContent = text;
-    message.appendChild(paragraph);
-
-    const time = document.createElement("time");
-    time.textContent = index === messages.length - 1 ? "Agora" : "09:39";
-    message.appendChild(time);
-
-    messageArea.appendChild(message);
-  });
-
-  messageArea.scrollTop = messageArea.scrollHeight;
+function formatarHora(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
-conversationButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    conversationButtons.forEach((item) => item.classList.remove("is-active"));
-    button.classList.add("is-active");
-    const contactName = button.dataset.contact;
-    activeContact.textContent = contactName;
-    renderMessages(contactName);
-  });
+function formatarDataCurta(iso) {
+  const d = new Date(iso);
+  const agora = new Date();
+  const diff = agora - d;
+  if (diff < 86400000 && d.getDate() === agora.getDate()) return formatarHora(iso);
+  if (diff < 172800000) return 'Ontem';
+  return `${d.getDate()}/${d.getMonth()+1}`;
+}
+
+function iniciais(nome) {
+  return (nome || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+}
+
+/* ── Lista de conversas ─────────────────────────────────── */
+async function carregarConversas() {
+  try {
+    const res = await Auth.fetch('/api/conversas');
+    if (!res) return;
+    const conversas = await res.json();
+
+    conversationList.innerHTML = '';
+
+    if (!conversas.length) {
+      conversationList.innerHTML = '<p style="padding:24px;color:#94a3b8;font-size:0.9rem">Nenhuma conversa ainda.</p>';
+      return;
+    }
+
+    conversas.forEach((c) => {
+      const card = document.createElement('button');
+      card.className = 'conversation-card';
+      card.type = 'button';
+      card.dataset.id = c.id;
+      card.dataset.status = c.status;
+      card.dataset.contact = c.contato_nome || 'Desconhecido';
+      card.innerHTML = `
+        <span class="avatar">${iniciais(c.contato_nome)}</span>
+        <span class="conversation-main">
+          <strong>${c.contato_nome || 'Desconhecido'}</strong>
+          <small>${c.contato_telefone || c.canal || 'WhatsApp'}</small>
+        </span>
+        <span class="conversation-meta">
+          <time>${formatarDataCurta(c.atualizado_em)}</time>
+        </span>
+      `;
+
+      card.addEventListener('click', () => selecionarConversa(c, card));
+      conversationList.appendChild(card);
+    });
+
+    // Selecionar a primeira automaticamente
+    const primeiro = conversationList.querySelector('.conversation-card');
+    if (primeiro) primeiro.click();
+
+    filtrarConversas();
+  } catch (err) {
+    console.error('Erro ao carregar conversas:', err);
+  }
+}
+
+async function selecionarConversa(conversa, cardEl) {
+  conversaAtiva = conversa;
+
+  document.querySelectorAll('.conversation-card').forEach(c => c.classList.remove('is-active'));
+  cardEl.classList.add('is-active');
+
+  activeContact.textContent = conversa.contato_nome || 'Desconhecido';
+
+  const finalizada = conversa.status === 'finalizada';
+  chatStatus.innerHTML = finalizada
+    ? `<span class="status-dot" style="background:#cbd5e1;box-shadow:none"></span> Finalizada · WhatsApp`
+    : `<span class="status-dot"></span> Em atendimento · WhatsApp`;
+
+  if (btnFinalizar) {
+    btnFinalizar.textContent = finalizada ? 'Reabrir' : 'Finalizar';
+  }
+
+  await carregarMensagens(conversa.id);
+}
+
+/* ── Mensagens ──────────────────────────────────────────── */
+async function carregarMensagens(conversaId) {
+  messageArea.innerHTML = '<p style="padding:24px;color:#94a3b8;font-size:0.9rem">Carregando...</p>';
+
+  try {
+    const res = await Auth.fetch(`/api/conversas/${conversaId}/mensagens`);
+    if (!res) return;
+    const mensagens = await res.json();
+
+    messageArea.innerHTML = '';
+
+    if (!mensagens.length) {
+      messageArea.innerHTML = '<p style="padding:24px;color:#94a3b8;font-size:0.9rem">Nenhuma mensagem ainda.</p>';
+      return;
+    }
+
+    mensagens.forEach(m => {
+      const div = document.createElement('div');
+      div.className = `message ${m.tipo}`;
+
+      const p = document.createElement('p');
+      p.textContent = m.conteudo;
+      div.appendChild(p);
+
+      const time = document.createElement('time');
+      time.textContent = formatarHora(m.criado_em);
+      div.appendChild(time);
+
+      messageArea.appendChild(div);
+    });
+
+    messageArea.scrollTop = messageArea.scrollHeight;
+  } catch (err) {
+    console.error('Erro ao carregar mensagens:', err);
+  }
+}
+
+/* ── Enviar mensagem ────────────────────────────────────── */
+composer?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const texto = messageInput.value.trim();
+  if (!texto || !conversaAtiva) return;
+
+  // Exibir imediatamente (feedback otimista)
+  const div = document.createElement('div');
+  div.className = 'message sent';
+  div.innerHTML = `<p>${texto}</p><time>Agora</time>`;
+  messageArea.appendChild(div);
+  messageArea.scrollTop = messageArea.scrollHeight;
+  messageInput.value = '';
+
+  try {
+    await Auth.fetch(`/api/conversas/${conversaAtiva.id}/mensagens`, {
+      method: 'POST',
+      body: JSON.stringify({ tipo: 'sent', conteudo: texto })
+    });
+  } catch (err) {
+    console.error('Erro ao salvar mensagem:', err);
+  }
 });
 
-quickReplies.forEach((button) => {
-  button.addEventListener("click", () => {
-    messageInput.value = button.dataset.reply;
+/* ── Finalizar / Reabrir ────────────────────────────────── */
+btnFinalizar?.addEventListener('click', async () => {
+  if (!conversaAtiva) return;
+
+  const finalizada = conversaAtiva.status === 'finalizada';
+  const novoStatus = finalizada ? 'em-atendimento' : 'finalizada';
+
+  try {
+    const res = await Auth.fetch(`/api/conversas/${conversaAtiva.id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: novoStatus })
+    });
+    if (!res || !res.ok) return;
+
+    conversaAtiva.status = novoStatus;
+    const cardAtivo = document.querySelector('.conversation-card.is-active');
+    if (cardAtivo) cardAtivo.dataset.status = novoStatus;
+
+    if (novoStatus === 'finalizada') {
+      chatStatus.innerHTML = `<span class="status-dot" style="background:#cbd5e1;box-shadow:none"></span> Finalizada · WhatsApp`;
+      btnFinalizar.textContent = 'Reabrir';
+      showToast('Conversa finalizada!');
+    } else {
+      chatStatus.innerHTML = `<span class="status-dot"></span> Em atendimento · WhatsApp`;
+      btnFinalizar.textContent = 'Finalizar';
+      showToast('Conversa reaberta.', 'info');
+    }
+
+    filtrarConversas();
+  } catch (err) {
+    console.error('Erro ao atualizar status:', err);
+  }
+});
+
+/* ── Respostas rápidas ──────────────────────────────────── */
+quickReplies.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    messageInput.value = btn.dataset.reply;
     messageInput.focus();
   });
 });
 
-composer.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const text = messageInput.value.trim();
-  if (!text) return;
-
-  const message = document.createElement("div");
-  message.className = "message sent";
-
-  const paragraph = document.createElement("p");
-  paragraph.textContent = text;
-  message.appendChild(paragraph);
-
-  const time = document.createElement("time");
-  time.textContent = "Agora";
-  message.appendChild(time);
-
-  messageArea.appendChild(message);
-  messageInput.value = "";
-  messageArea.scrollTop = messageArea.scrollHeight;
-});
-
-/* ── Conversas: filtro por status ──────────────────────── */
-const conversaChips = document.querySelectorAll(".filter-row .filter-chip");
-const conversaSearch = document.querySelector("#conversaSearch");
-const conversaCards = document.querySelectorAll(".conversation-card");
+/* ── Filtro de conversas ────────────────────────────────── */
+const conversaChips  = document.querySelectorAll('.filter-row .filter-chip');
+const conversaSearch = document.querySelector('#conversaSearch');
 
 function filtrarConversas() {
-  const filtroAtivo = document.querySelector(".filter-row .filter-chip.is-active")?.dataset.filter || "todas";
-  const query = conversaSearch?.value.toLowerCase().trim() || "";
+  const filtroAtivo = document.querySelector('.filter-row .filter-chip.is-active')?.dataset.filter || 'todas';
+  const query = conversaSearch?.value.toLowerCase().trim() || '';
 
-  conversaCards.forEach((card) => {
-    const status = card.dataset.status || "";
-    const nome = card.querySelector("strong")?.textContent.toLowerCase() || "";
-    const preview = card.querySelector("small")?.textContent.toLowerCase() || "";
+  document.querySelectorAll('.conversation-card').forEach((card) => {
+    const status  = card.dataset.status || '';
+    const nome    = card.dataset.contact?.toLowerCase() || '';
+    const preview = card.querySelector('small')?.textContent.toLowerCase() || '';
 
-    const passaFiltro = filtroAtivo === "todas" || status === filtroAtivo;
-    const passaBusca = !query || nome.includes(query) || preview.includes(query);
+    const passaFiltro = filtroAtivo === 'todas' || status === filtroAtivo;
+    const passaBusca  = !query || nome.includes(query) || preview.includes(query);
 
-    card.style.display = passaFiltro && passaBusca ? "" : "none";
+    card.style.display = passaFiltro && passaBusca ? '' : 'none';
   });
 }
 
 conversaChips.forEach((chip) => {
-  chip.addEventListener("click", () => {
-    conversaChips.forEach((c) => c.classList.remove("is-active"));
-    chip.classList.add("is-active");
+  chip.addEventListener('click', () => {
+    conversaChips.forEach(c => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
     filtrarConversas();
   });
 });
 
-conversaSearch?.addEventListener("input", filtrarConversas);
+conversaSearch?.addEventListener('input', filtrarConversas);
 
-/* ── Botão Finalizar ───────────────────────────────────── */
-const btnFinalizar  = document.querySelector("#btnFinalizar");
-const chatStatus    = document.querySelector("#chatStatus");
-
-btnFinalizar?.addEventListener("click", () => {
-  const cardAtivo = document.querySelector(".conversation-card.is-active");
-  if (!cardAtivo) return;
-
-  const jaFinalizada = cardAtivo.dataset.status === "finalizada";
-
-  if (jaFinalizada) {
-    // Reabrir
-    cardAtivo.dataset.status = "em-atendimento";
-    cardAtivo.style.opacity  = "";
-    chatStatus.innerHTML     = `<span class="status-dot"></span> Em atendimento · WhatsApp`;
-    btnFinalizar.textContent = "Finalizar";
-    showToast("Conversa reaberta.", "info");
-  } else {
-    // Finalizar
-    cardAtivo.dataset.status = "finalizada";
-    cardAtivo.style.opacity  = "0.5";
-    chatStatus.innerHTML     = `<span class="status-dot" style="background:#cbd5e1;box-shadow:none"></span> Finalizada · WhatsApp`;
-    btnFinalizar.textContent = "Reabrir";
-    showToast("Conversa finalizada!");
-
-    // Remove badge de não lido, se houver
-    cardAtivo.querySelector(".conversation-meta b")?.remove();
-  }
-
-  filtrarConversas();
-});
+// Iniciar
+carregarConversas();

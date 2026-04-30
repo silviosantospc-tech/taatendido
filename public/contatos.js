@@ -1,34 +1,99 @@
-/* ── Filtro por status ─────────────────────────────────── */
-const chips    = document.querySelectorAll(".filter-row .filter-chip");
-const search   = document.querySelector("#contatoSearch");
-const rows     = document.querySelectorAll("#contatosTbody tr");
+/* ── Contatos: API + UI ─────────────────────────────────── */
+
+const statusMap = {
+  "aberta":         { classe: "tag-blue",  label: "Aberta" },
+  "em-atendimento": { classe: "tag-green", label: "Em atendimento" },
+  "aguardando":     { classe: "tag-amber", label: "Aguardando" },
+  "finalizado":     { classe: "tag-muted", label: "Finalizado" },
+  "ativo":          { classe: "tag-blue",  label: "Ativo" },
+};
+
+const cores = ["#2563eb", "#22c55e", "#7c3aed", "#f97316", "#ec4899", "#0ea5e9"];
+
+const tbody    = document.querySelector("#contatosTbody");
 const contador = document.querySelector(".topbar p");
+
+function iniciais(nome) {
+  return (nome || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function formatarData(iso) {
+  const d = new Date(iso);
+  const agora = new Date();
+  if (d.getDate() === agora.getDate()) {
+    return `Hoje, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+function renderContato(contato, index) {
+  const ini = iniciais(contato.nome);
+  const cor = cores[index % cores.length];
+  const { classe, label } = statusMap[contato.status] || statusMap["ativo"];
+
+  const tr = document.createElement("tr");
+  tr.dataset.status = contato.status || 'ativo';
+  tr.dataset.nome   = contato.nome;
+  tr.innerHTML = `
+    <td>
+      <span class="mini-contact">
+        <b style="background:${cor}">${ini}</b>
+        ${contato.nome}
+      </span>
+    </td>
+    <td class="td-muted">${contato.telefone || '—'}</td>
+    <td class="td-muted">WhatsApp</td>
+    <td><span class="tag ${classe}">${label}</span></td>
+    <td class="td-muted">${formatarData(contato.criado_em)}</td>
+    <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
+  `;
+  return tr;
+}
+
+async function carregarContatos() {
+  try {
+    const res = await Auth.fetch('/api/contatos');
+    if (!res) return;
+    const contatos = await res.json();
+
+    tbody.innerHTML = '';
+    contatos.forEach((c, i) => tbody.appendChild(renderContato(c, i)));
+
+    atualizarContador();
+    filtrarContatos();
+  } catch (err) {
+    console.error('Erro ao carregar contatos:', err);
+  }
+}
+
+function atualizarContador() {
+  if (!contador) return;
+  const total = tbody.querySelectorAll('tr:not([style*="none"])').length;
+  contador.textContent = `${total} contato${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`;
+}
+
+/* ── Filtro ─────────────────────────────────────────────── */
+const chips  = document.querySelectorAll(".filter-row .filter-chip");
+const search = document.querySelector("#contatoSearch");
 
 function filtrarContatos() {
   const filtro = document.querySelector(".filter-row .filter-chip.is-active")?.dataset.filter || "todos";
   const query  = search?.value.toLowerCase().trim() || "";
-  let visiveis = 0;
 
-  rows.forEach((row) => {
+  tbody.querySelectorAll("tr").forEach((row) => {
     const status = row.dataset.status || "";
     const nome   = (row.dataset.nome || "").toLowerCase();
-
     const passaFiltro = filtro === "todos" || status === filtro;
     const passaBusca  = !query || nome.includes(query);
-
-    const visivel = passaFiltro && passaBusca;
-    row.style.display = visivel ? "" : "none";
-    if (visivel) visiveis++;
+    row.style.display = passaFiltro && passaBusca ? "" : "none";
   });
 
-  if (contador) {
-    contador.textContent = `${visiveis} contato${visiveis !== 1 ? "s" : ""} cadastrado${visiveis !== 1 ? "s" : ""}`;
-  }
+  atualizarContador();
 }
 
 chips.forEach((chip) => {
   chip.addEventListener("click", () => {
-    chips.forEach((c) => c.classList.remove("is-active"));
+    chips.forEach(c => c.classList.remove("is-active"));
     chip.classList.add("is-active");
     filtrarContatos();
   });
@@ -36,22 +101,12 @@ chips.forEach((chip) => {
 
 search?.addEventListener("input", filtrarContatos);
 
-/* ── Modal: Novo contato ───────────────────────────────── */
-const modal         = document.querySelector("#modalContato");
-const btnAbrir      = document.querySelector("#btnNovoContato");
-const btnFechar     = document.querySelector("#btnFecharModal");
-const btnCancelar   = document.querySelector("#btnCancelar");
-const form          = document.querySelector("#formNovoContato");
-const tbody         = document.querySelector("#contatosTbody");
-
-const statusMap = {
-  "aberta":          { classe: "tag-blue",  label: "Aberta" },
-  "em-atendimento":  { classe: "tag-green", label: "Em atendimento" },
-  "aguardando":      { classe: "tag-amber", label: "Aguardando" },
-  "finalizado":      { classe: "tag-muted", label: "Finalizado" },
-};
-
-const cores = ["#2563eb", "#22c55e", "#7c3aed", "#f97316", "#ec4899", "#0ea5e9"];
+/* ── Modal: Novo contato ────────────────────────────────── */
+const modal       = document.querySelector("#modalContato");
+const btnAbrir    = document.querySelector("#btnNovoContato");
+const btnFechar   = document.querySelector("#btnFecharModal");
+const btnCancelar = document.querySelector("#btnCancelar");
+const form        = document.querySelector("#formNovoContato");
 
 function abrirModal() {
   modal.hidden = false;
@@ -72,51 +127,42 @@ function fecharModal() {
 btnAbrir?.addEventListener("click", abrirModal);
 btnFechar?.addEventListener("click", fecharModal);
 btnCancelar?.addEventListener("click", fecharModal);
+modal?.addEventListener("click", e => { if (e.target === modal) fecharModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) fecharModal(); });
 
-modal?.addEventListener("click", (e) => {
-  if (e.target === modal) fecharModal();
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modal.hidden) fecharModal();
-});
-
-form?.addEventListener("submit", (e) => {
+form?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const nome    = document.querySelector("#inputNome").value.trim();
-  const tel     = document.querySelector("#inputTelefone").value.trim();
-  const origem  = document.querySelector("#inputOrigem").value;
-  const status  = document.querySelector("#inputStatus").value;
+  const nome     = document.querySelector("#inputNome").value.trim();
+  const telefone = document.querySelector("#inputTelefone").value.trim();
+  const btnSalvar = form.querySelector('button[type="submit"]');
 
-  if (!nome || !tel) return;
+  if (!nome || !telefone) return;
 
-  // Iniciais do avatar
-  const iniciais = nome.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-  const cor      = cores[tbody.rows.length % cores.length];
-  const { classe, label } = statusMap[status] || statusMap["aberta"];
+  btnSalvar.textContent = 'Salvando...';
+  btnSalvar.disabled = true;
 
-  const agora = new Date();
-  const hora  = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
+  try {
+    const res = await Auth.fetch('/api/contatos', {
+      method: 'POST',
+      body: JSON.stringify({ nome, telefone, segmento: 'WhatsApp' })
+    });
 
-  const tr = document.createElement("tr");
-  tr.dataset.status = status;
-  tr.dataset.nome   = nome;
-  tr.innerHTML = `
-    <td>
-      <span class="mini-contact">
-        <b style="background:${cor}">${iniciais}</b>
-        ${nome}
-      </span>
-    </td>
-    <td class="td-muted">${tel}</td>
-    <td class="td-muted">${origem}</td>
-    <td><span class="tag ${classe}">${label}</span></td>
-    <td class="td-muted">Hoje, ${hora}</td>
-    <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
-  `;
+    if (!res || !res.ok) {
+      showToast('Erro ao salvar contato.', 'warning');
+      return;
+    }
 
-  tbody.prepend(tr);
-  filtrarContatos();
-  fecharModal();
+    await carregarContatos();
+    fecharModal();
+    showToast('Contato cadastrado com sucesso!');
+  } catch {
+    showToast('Erro de conexão.', 'warning');
+  } finally {
+    btnSalvar.textContent = 'Salvar contato';
+    btnSalvar.disabled = false;
+  }
 });
+
+// Iniciar
+carregarContatos();
