@@ -23,6 +23,9 @@ const origensPermitidas = [
   'http://localhost:3000',
   'http://localhost:5500',
 ];
+// Necessário para rate-limit funcionar corretamente atrás do Traefik
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || origensPermitidas.includes(origin)) {
@@ -78,7 +81,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Conexão com banco de dados ────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: false,
 });
 
 // ── Middleware de autenticação ────────────────────────────
