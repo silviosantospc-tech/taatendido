@@ -54,13 +54,6 @@
         <a href="respostas.html">Saiba mais &rarr;</a>
       </section>
 
-      <section class="plan-card" aria-label="Plano atual">
-        <strong>Plano Profissional</strong>
-        <span>Renova em 15/06/2025</span>
-        <div class="progress"><i></i></div>
-        <small>78% usado</small>
-      </section>
-
       <button class="logout-btn" onclick="localStorage.removeItem('ta_token');localStorage.removeItem('ta_usuario');window.location.href='login.html'">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sair
@@ -319,45 +312,13 @@
           </div>
         </section>
 
-        <!-- Atendentes -->
+        <!-- Atendente logado -->
         <section class="analytics-card">
           <div class="analytics-head compact">
-            <h2>Atendentes</h2>
-            <span class="tag tag-green" style="font-size:0.72rem">3 online</span>
+            <h2>Minha conta</h2>
+            <span class="tag tag-green" style="font-size:0.72rem">online</span>
           </div>
-          <div class="agent-list">
-            <div class="agent-row">
-              <span class="avatar">J</span>
-              <div class="agent-info">
-                <strong>Júlia</strong>
-                <small>3 conversas ativas</small>
-              </div>
-              <span class="status-dot"></span>
-            </div>
-            <div class="agent-row">
-              <span class="avatar green">P</span>
-              <div class="agent-info">
-                <strong>Pedro</strong>
-                <small>5 conversas ativas</small>
-              </div>
-              <span class="status-dot"></span>
-            </div>
-            <div class="agent-row">
-              <span class="avatar orange">C</span>
-              <div class="agent-info">
-                <strong>Camila</strong>
-                <small>2 conversas ativas</small>
-              </div>
-              <span class="status-dot"></span>
-            </div>
-            <div class="agent-row">
-              <span class="avatar purple">M</span>
-              <div class="agent-info">
-                <strong>Marcos</strong>
-                <small>ausente</small>
-              </div>
-              <span class="status-dot offline"></span>
-            </div>
+          <div class="agent-list" id="agentList">
           </div>
         </section>
 

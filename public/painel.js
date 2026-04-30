@@ -88,4 +88,22 @@ async function carregarStats() {
   }
 }
 
+// Preencher seção "Minha conta"
+if (usuario) {
+  const agentList = document.getElementById('agentList');
+  if (agentList) {
+    const ini = (usuario.nome || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+    agentList.innerHTML = `
+      <div class="agent-row">
+        <span class="avatar">${ini}</span>
+        <div class="agent-info">
+          <strong>${usuario.nome}</strong>
+          <small>${usuario.papel === 'admin' ? 'Administrador' : 'Atendente'}</small>
+        </div>
+        <span class="status-dot"></span>
+      </div>
+    `;
+  }
+}
+
 carregarStats();
