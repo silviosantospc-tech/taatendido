@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const multer = require('multer');
+const sharp = require('sharp');
 const fs = require('fs');
 const crypto = require('crypto');
 
@@ -482,26 +483,33 @@ app.post('/api/empresa/config', authMiddleware, async (req, res) => {
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+// Multer usa memória — sharp processa e salva em disco
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const nome = crypto.randomBytes(12).toString('hex') + ext;
-      cb(null, nome);
-    },
-  }),
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // aceita até 10 MB
   fileFilter: (req, file, cb) => {
-    const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
+    const ok = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.mimetype);
     cb(ok ? null : new Error('Formato inválido. Use JPG, PNG ou WebP.'), ok);
   },
 });
 
-app.post('/api/upload/foto', authMiddleware, upload.single('foto'), (req, res) => {
+app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({ url });
+  try {
+    const nome = crypto.randomBytes(12).toString('hex') + '.webp';
+    const destino = path.join(UPLOADS_DIR, nome);
+
+    // Redimensiona para 800×800, corta em quadrado, converte para WebP
+    await sharp(req.file.buffer)
+      .resize(800, 800, { fit: 'cover', position: 'centre' })
+      .webp({ quality: 85 })
+      .toFile(destino);
+
+    res.json({ url: `/uploads/${nome}` });
+  } catch (err) {
+    console.error('[upload/foto]', err.message);
+    res.status(500).json({ erro: 'Erro ao processar imagem.' });
+  }
 });
 
 // ── Produtos ──────────────────────────────────────────────
