@@ -563,7 +563,8 @@ app.post('/api/agente/responder', authMiddleware, async (req, res) => {
 
     res.json(resposta);
   } catch (err) {
-    erroInterno(res, err);
+    console.error('[agente/responder]', err?.message || err);
+    res.status(500).json({ erro: 'Erro no agente: ' + (err?.message || 'desconhecido') });
   }
 });
 
@@ -589,7 +590,8 @@ app.post('/api/agente/testar', authMiddleware, async (req, res) => {
 
     res.json(resposta);
   } catch (err) {
-    erroInterno(res, err);
+    console.error('[agente/testar]', err?.message || err);
+    res.status(500).json({ erro: 'Erro no agente: ' + (err?.message || 'desconhecido') });
   }
 });
 

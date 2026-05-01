@@ -97,7 +97,8 @@ document.getElementById('btnEnviarTeste').addEventListener('click', async () => 
         output.textContent += '\n\n⚠️ O agente sinalizou para escalar para um atendente humano.';
       }
     } else {
-      output.textContent = 'Erro ao obter resposta do agente.';
+      const data = await res?.json().catch(() => ({}));
+      output.textContent = '❌ ' + (data?.erro || 'Erro ao obter resposta do agente.');
     }
   } catch (err) {
     console.error(err);
