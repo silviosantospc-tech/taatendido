@@ -151,7 +151,7 @@ document.getElementById('listaProdutos').addEventListener('change', async functi
       renderProdutos();
       toast('Foto atualizada!', 'success');
     }
-  } catch { toast('Erro ao atualizar foto.', 'error'); }
+  } catch { try { toast('Erro ao atualizar foto.', 'error'); } catch { alert('Erro ao atualizar foto.'); } }
 });
 
 /* ── Event delegation — cliques nos botões da lista ─── */

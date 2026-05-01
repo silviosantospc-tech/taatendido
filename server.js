@@ -495,23 +495,19 @@ const upload = multer({
 app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
   try {
-    const nome = crypto.randomBytes(12).toString('hex') + '.jpg';
+    // Garante que o diretório existe (pode ter sido apagado)
+    await fs.promises.mkdir(UPLOADS_DIR, { recursive: true });
+
+    const ext  = req.file.mimetype === 'image/png'  ? '.png'
+               : req.file.mimetype === 'image/webp' ? '.webp' : '.jpg';
+    const nome    = crypto.randomBytes(12).toString('hex') + ext;
     const destino = path.join(UPLOADS_DIR, nome);
 
-    // Carrega jimp sob demanda para não travar o servidor na inicialização
-    const Jimp = require('jimp');
-    const imagem = await Jimp.read(req.file.buffer);
-    const lado = Math.min(imagem.width, imagem.height);
-    await imagem
-      .crop((imagem.width - lado) / 2, (imagem.height - lado) / 2, lado, lado)
-      .resize(800, 800)
-      .quality(85)
-      .writeAsync(destino);
-
+    await fs.promises.writeFile(destino, req.file.buffer);
     res.json({ url: `/uploads/${nome}` });
   } catch (err) {
-    console.error('[upload/foto]', err.message);
-    res.status(500).json({ erro: 'Erro ao processar imagem.' });
+    console.error('[upload/foto]', err);
+    res.status(500).json({ erro: 'Erro ao salvar imagem.' });
   }
 });
 
