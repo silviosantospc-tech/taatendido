@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const multer = require('multer');
-const sharp = require('sharp');
+const Jimp = require('jimp');
 const fs = require('fs');
 const crypto = require('crypto');
 
@@ -496,14 +496,17 @@ const upload = multer({
 app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
   try {
-    const nome = crypto.randomBytes(12).toString('hex') + '.webp';
+    const nome = crypto.randomBytes(12).toString('hex') + '.jpg';
     const destino = path.join(UPLOADS_DIR, nome);
 
-    // Redimensiona para 800×800, corta em quadrado, converte para WebP
-    await sharp(req.file.buffer)
-      .resize(800, 800, { fit: 'cover', position: 'centre' })
-      .webp({ quality: 85 })
-      .toFile(destino);
+    // Redimensiona para 800×800 cortando no centro
+    const imagem = await Jimp.read(req.file.buffer);
+    const lado = Math.min(imagem.width, imagem.height);
+    await imagem
+      .crop((imagem.width - lado) / 2, (imagem.height - lado) / 2, lado, lado)
+      .resize(800, 800)
+      .quality(85)
+      .writeAsync(destino);
 
     res.json({ url: `/uploads/${nome}` });
   } catch (err) {
