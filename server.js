@@ -539,6 +539,25 @@ app.post('/api/produtos', authMiddleware, async (req, res) => {
   }
 });
 
+app.patch('/api/produtos/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+    const { nome, descricao, preco, categoria } = req.body;
+    if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
+    const precoNum = preco ? parseFloat(preco) : null;
+    if (preco && isNaN(precoNum)) return res.status(400).json({ erro: 'Preço inválido.' });
+    const { rows } = await pool.query(
+      'UPDATE produtos SET nome=$1, descricao=$2, preco=$3, categoria=$4 WHERE id=$5 RETURNING *',
+      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), id]
+    );
+    if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    res.json(rows[0]);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
 app.patch('/api/produtos/:id/foto', authMiddleware, async (req, res) => {
   try {
     const id = validarId(req.params.id);
