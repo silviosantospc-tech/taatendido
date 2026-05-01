@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Respostas rápidas - TáAtendido</title>
-  <meta name="description" content="Respostas rápidas do protótipo TáAtendido.">
+  <title>Produtos - TáAtendido</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -31,11 +30,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Contatos
         </a>
-        <a class="nav-item is-active" href="respostas.html">
+        <a class="nav-item" href="respostas.html">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
           Respostas rápidas
         </a>
-        <a class="nav-item" href="produtos.html">
+        <a class="nav-item is-active" href="produtos.html">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
           Produtos
         </a>
@@ -48,9 +47,9 @@
       <section class="side-card" aria-label="Dica">
         <div class="side-card-top">
           <span class="status-dot"></span>
-          <strong>Dica</strong>
+          <strong>Produtos</strong>
         </div>
-        <p>Respostas prontas agilizam o atendimento sem perder o toque humano.</p>
+        <p>Cadastre aqui o cardápio ou catálogo. O agente de IA usa essas informações para responder os clientes.</p>
       </section>
 
       <button class="logout-btn" onclick="localStorage.removeItem('ta_token');localStorage.removeItem('ta_usuario');window.location.href='login.html'">
@@ -62,65 +61,62 @@
     <section class="workspace">
       <header class="topbar">
         <div>
-          <h1>Respostas rápidas</h1>
+          <h1>Produtos / Cardápio</h1>
         </div>
         <div class="top-actions">
-          <a class="secondary-button" href="painel.html">Voltar ao painel</a>
-          <button class="primary-button" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-            Nova resposta
-          </button>
+          <span id="contadorProdutos" style="font-size:.875rem;color:var(--text-muted)">Carregando…</span>
         </div>
       </header>
 
       <div class="settings-layout">
-        <section class="form-card wide-card">
-          <div class="form-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
-            <div>
-              <h2>Biblioteca da empresa</h2>
-              <p>Exemplos de respostas que podem ser usadas pelo atendente ou pelo bot simples.</p>
-            </div>
-            <div class="search-box" style="width:220px;flex-shrink:0">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input id="respostasSearch" type="search" placeholder="Buscar resposta..." aria-label="Buscar resposta">
-            </div>
-          </div>
-          <div class="reply-list">
-          </div>
-        </section>
-
+        <!-- Formulário de novo produto -->
         <section class="form-card">
           <div class="form-head">
-            <h2>Criar resposta</h2>
-            <p>Formulário visual para a próxima fase funcional.</p>
+            <h2>Adicionar produto</h2>
+            <p>Preencha as informações e clique em Adicionar.</p>
           </div>
-          <form class="settings-form one-column">
+          <form class="settings-form" id="formProduto">
             <label>
-              <span>Título</span>
-              <input id="inputTituloResposta" type="text" placeholder="Ex: Horário de funcionamento">
+              <span>Nome <span style="color:#ef4444">*</span></span>
+              <input type="text" id="prodNome" placeholder="Ex: X-Burguer, Coca-Cola 2L" maxlength="200" required>
             </label>
             <label>
               <span>Categoria</span>
-              <select id="inputCategoria">
-                <option>Atendimento</option>
-                <option>Reservas</option>
-                <option>Pedidos</option>
-                <option>Localização</option>
-                <option>Pagamento</option>
-              </select>
+              <input type="text" id="prodCategoria" placeholder="Ex: Lanches, Bebidas, Sobremesas" maxlength="100">
             </label>
             <label>
-              <span>Mensagem</span>
-              <textarea id="inputMensagem" placeholder="Digite a resposta pronta que será usada no atendimento."></textarea>
+              <span>Preço (R$)</span>
+              <input type="number" id="prodPreco" placeholder="0,00" min="0" step="0.01">
             </label>
-            <button class="primary-button full-button" type="button" id="btnSalvarResposta">Salvar resposta</button>
+            <label>
+              <span>Descrição</span>
+              <input type="text" id="prodDescricao" placeholder="Ex: Hambúrguer artesanal com queijo e bacon" maxlength="500">
+            </label>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="primary-button" type="submit" id="btnAdicionarProduto">
+                <svg viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Adicionar
+              </button>
+            </div>
           </form>
+        </section>
+
+        <!-- Lista de produtos -->
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Itens cadastrados</h2>
+            <p>Ative, desative ou remova itens do catálogo.</p>
+          </div>
+          <div id="listaProdutos">
+            <p style="color:var(--text-muted);font-size:.9rem;padding:8px 0">Carregando produtos…</p>
+          </div>
         </section>
       </div>
     </section>
   </main>
+
   <script src="toast.js"></script>
   <script src="auth.js"></script>
-  <script src="respostas.js"></script>
+  <script src="produtos.js"></script>
 </body>
 </html>

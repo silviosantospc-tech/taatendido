@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Empresa - TáAtendido</title>
-  <meta name="description" content="Configuração visual da empresa no TáAtendido.">
+  <title>Configurações - TáAtendido</title>
+  <meta name="description" content="Configuração da empresa no TáAtendido.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -35,6 +35,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
           Respostas rápidas
         </a>
+        <a class="nav-item" href="produtos.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          Produtos
+        </a>
         <a class="nav-item is-active" href="empresa.html">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Configurações
@@ -61,28 +65,29 @@
           <h1>Configurações</h1>
         </div>
         <div class="top-actions">
-          <a class="secondary-button" href="painel.html">Voltar ao painel</a>
-          <button class="primary-button" type="button" id="btnSalvarVisual">
+          <button class="secondary-button" type="button" id="btnTestarAgente">Testar agente IA</button>
+          <button class="primary-button" type="button" id="btnSalvar">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"></path></svg>
-            Salvar visual
+            Salvar
           </button>
         </div>
       </header>
 
       <div class="settings-layout">
+        <!-- Dados principais -->
         <section class="form-card">
           <div class="form-head">
             <h2>Dados principais</h2>
             <p>Essas informações identificam o negócio dentro do TáAtendido.</p>
           </div>
-          <form class="settings-form">
+          <form class="settings-form" id="formDados">
             <label>
               <span>Nome da empresa</span>
-              <input type="text" placeholder="Ex: Pousada Sol Mar">
+              <input type="text" id="nome_empresa" placeholder="Ex: Lanchonete Sabor & Cia" maxlength="200">
             </label>
             <label>
               <span>Segmento</span>
-              <select>
+              <select id="segmento">
                 <option value="">Selecione o segmento</option>
                 <option>Pousada / Hotel</option>
                 <option>Farmácia</option>
@@ -98,72 +103,123 @@
             </label>
             <label>
               <span>WhatsApp principal</span>
-              <input type="text" placeholder="(00) 00000-0000">
+              <input type="text" id="whatsapp" placeholder="(00) 00000-0000" maxlength="20">
             </label>
             <label>
               <span>Email</span>
-              <input type="email" placeholder="contato@suaempresa.com.br">
+              <input type="email" id="email" placeholder="contato@suaempresa.com.br" maxlength="150">
             </label>
           </form>
         </section>
 
+        <!-- Entrega e pagamento -->
+        <section class="form-card">
+          <div class="form-head">
+            <h2>Entrega e pagamento</h2>
+            <p>Informações usadas pelo agente de IA ao responder pedidos.</p>
+          </div>
+          <form class="settings-form">
+            <label>
+              <span>Formas de pagamento</span>
+              <input type="text" id="formas_pagamento" placeholder="Ex: Pix, cartão, dinheiro" maxlength="200">
+            </label>
+            <label>
+              <span>Taxa de entrega</span>
+              <input type="text" id="taxa_entrega" placeholder="Ex: R$ 5,00 — Grátis acima de R$ 50" maxlength="100">
+            </label>
+            <label>
+              <span>Tempo médio de entrega</span>
+              <input type="text" id="tempo_entrega" placeholder="Ex: 30 a 45 minutos" maxlength="100">
+            </label>
+          </form>
+        </section>
+
+        <!-- Mensagens automáticas -->
         <section class="form-card">
           <div class="form-head">
             <h2>Mensagens automáticas</h2>
-            <p>Textos usados pelo bot simples na primeira abordagem.</p>
+            <p>Textos usados pelo agente de IA na conversa com os clientes.</p>
           </div>
           <form class="settings-form one-column">
             <label>
-              <span>Saudação</span>
-              <textarea placeholder="Ex: Olá! Seja bem-vindo ao nosso atendimento. Como podemos ajudar?"></textarea>
+              <span>Saudação (primeira mensagem)</span>
+              <textarea id="msg_saudacao" rows="3" placeholder="Ex: Olá! Seja bem-vindo à Lanchonete Sabor & Cia. Como posso ajudar?" maxlength="500"></textarea>
             </label>
             <label>
               <span>Fora do horário</span>
-              <textarea placeholder="Ex: No momento estamos fora do horário de atendimento. Deixe sua mensagem que responderemos em breve."></textarea>
+              <textarea id="msg_fora_horario" rows="3" placeholder="Ex: No momento estamos fechados. Voltamos às 08h. Deixe sua mensagem!" maxlength="500"></textarea>
             </label>
             <label>
               <span>Quando não souber responder</span>
-              <textarea placeholder="Ex: Vou chamar um atendente para ajudar você com mais detalhes."></textarea>
+              <textarea id="msg_sem_resposta" rows="3" placeholder="Ex: Vou chamar um atendente para ajudar você com mais detalhes." maxlength="500"></textarea>
             </label>
           </form>
         </section>
 
-        <section class="form-card" id="horarios">
+        <!-- Horários -->
+        <section class="form-card">
           <div class="form-head">
             <h2>Horários de atendimento</h2>
-            <p>Base visual para controlar mensagens de ausência e atendimento humano.</p>
+            <p>O agente usa essas informações para avisar clientes fora do horário.</p>
           </div>
-          <div class="schedule-grid">
-            <div><strong>Segunda a sexta</strong><span>08:00 às 18:00</span></div>
-            <div><strong>Sábado</strong><span>08:00 às 12:00</span></div>
-            <div><strong>Domingo</strong><span>Fechado</span></div>
-          </div>
+          <form class="settings-form one-column">
+            <label>
+              <span>Segunda a sexta</span>
+              <input type="text" id="horario_seg_sex" placeholder="Ex: 08:00 às 18:00" maxlength="50">
+            </label>
+            <label>
+              <span>Sábado</span>
+              <input type="text" id="horario_sabado" placeholder="Ex: 08:00 às 12:00 ou Fechado" maxlength="50">
+            </label>
+            <label>
+              <span>Domingo</span>
+              <input type="text" id="horario_domingo" placeholder="Ex: Fechado ou 09:00 às 13:00" maxlength="50">
+            </label>
+          </form>
         </section>
 
+        <!-- Automação -->
         <section class="form-card">
           <div class="form-head">
             <h2>Automação</h2>
-            <p>Controles iniciais para decidir quando o bot deve atuar.</p>
+            <p>Controle quando o agente de IA deve atuar.</p>
           </div>
           <div class="automation-list">
             <label class="switch-row">
               <span>Responder saudação automaticamente</span>
-              <input type="checkbox" checked>
+              <input type="checkbox" id="auto_saudacao">
             </label>
             <label class="switch-row">
               <span>Enviar mensagem fora do horário</span>
-              <input type="checkbox" checked>
+              <input type="checkbox" id="auto_fora_horario">
             </label>
             <label class="switch-row">
-              <span>Encaminhar dúvidas difíceis para humano</span>
-              <input type="checkbox" checked>
+              <span>Escalar dúvidas difíceis para humano</span>
+              <input type="checkbox" id="auto_escalar">
             </label>
+          </div>
+        </section>
+
+        <!-- Testar agente -->
+        <section class="form-card" id="secaoTestar" style="display:none">
+          <div class="form-head">
+            <h2>Testar agente de IA</h2>
+            <p>Simule uma mensagem de cliente e veja como o agente responderia.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:8px">
+              <input type="text" id="inputTeste" placeholder="Ex: Qual o preço do X-Burguer?" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font:inherit">
+              <button class="primary-button" type="button" id="btnEnviarTeste">Enviar</button>
+            </div>
+            <div id="respostaTeste" style="background:var(--surface-2,#f8fafc);border:1.5px solid var(--border);border-radius:8px;padding:14px;min-height:60px;font-size:.95rem;white-space:pre-wrap;color:var(--text)">A resposta do agente aparecerá aqui.</div>
           </div>
         </section>
       </div>
     </section>
   </main>
+
   <script src="toast.js"></script>
+  <script src="auth.js"></script>
   <script src="empresa.js"></script>
 </body>
 </html>

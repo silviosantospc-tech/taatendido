@@ -162,6 +162,23 @@ async function initDB() {
       mensagem TEXT NOT NULL,
       criado_em TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS empresa_config (
+      id SERIAL PRIMARY KEY,
+      chave TEXT UNIQUE NOT NULL,
+      valor TEXT,
+      atualizado_em TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS produtos (
+      id SERIAL PRIMARY KEY,
+      nome TEXT NOT NULL,
+      descricao TEXT,
+      preco NUMERIC(10,2),
+      categoria TEXT,
+      disponivel BOOLEAN DEFAULT TRUE,
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
   `);
   console.log('Banco de dados inicializado com sucesso.');
 }
@@ -413,6 +430,164 @@ app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
     const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [id]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Resposta não encontrada.' });
     res.json({ mensagem: 'Resposta removida.' });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+// ── Empresa: configuração ─────────────────────────────────
+app.get('/api/empresa/config', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const config = {};
+    rows.forEach(r => { config[r.chave] = r.valor; });
+    res.json(config);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.post('/api/empresa/config', authMiddleware, async (req, res) => {
+  try {
+    const permitidas = [
+      'nome_empresa','segmento','whatsapp','email',
+      'msg_saudacao','msg_fora_horario','msg_sem_resposta',
+      'horario_seg_sex','horario_sabado','horario_domingo',
+      'auto_saudacao','auto_fora_horario','auto_escalar',
+      'formas_pagamento','taxa_entrega','tempo_entrega',
+    ];
+    const entries = Object.entries(req.body).filter(([k]) => permitidas.includes(k));
+    if (!entries.length) return res.status(400).json({ erro: 'Nenhum campo válido enviado.' });
+
+    for (const [chave, valor] of entries) {
+      await pool.query(`
+        INSERT INTO empresa_config (chave, valor, atualizado_em)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (chave) DO UPDATE SET valor=$2, atualizado_em=NOW()
+      `, [chave, String(valor).slice(0, 1000)]);
+    }
+    res.json({ mensagem: 'Configurações salvas.' });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+// ── Produtos ──────────────────────────────────────────────
+app.get('/api/produtos', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM produtos ORDER BY categoria, nome');
+    res.json(rows);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.post('/api/produtos', authMiddleware, async (req, res) => {
+  try {
+    const { nome, descricao, preco, categoria } = req.body;
+    if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
+    const precoNum = preco ? parseFloat(preco) : null;
+    if (preco && isNaN(precoNum)) return res.status(400).json({ erro: 'Preço inválido.' });
+    const { rows } = await pool.query(
+      'INSERT INTO produtos (nome, descricao, preco, categoria) VALUES ($1, $2, $3, $4) RETURNING *',
+      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100)]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.patch('/api/produtos/:id/disponivel', authMiddleware, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+    const { disponivel } = req.body;
+    const { rows } = await pool.query(
+      'UPDATE produtos SET disponivel=$1 WHERE id=$2 RETURNING *',
+      [!!disponivel, id]
+    );
+    if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    res.json(rows[0]);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.delete('/api/produtos/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+    const result = await pool.query('DELETE FROM produtos WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    res.json({ mensagem: 'Produto removido.' });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+// ── Agente IA ─────────────────────────────────────────────
+const agente = require('./agente');
+
+app.post('/api/agente/responder', authMiddleware, async (req, res) => {
+  try {
+    const { conversa_id, mensagem } = req.body;
+    if (!mensagem?.trim()) return res.status(400).json({ erro: 'Mensagem é obrigatória.' });
+    if (mensagem.length > 2000) return res.status(400).json({ erro: 'Mensagem muito longa.' });
+
+    const id = validarId(conversa_id);
+    if (!id) return res.status(400).json({ erro: 'conversa_id inválido.' });
+
+    // Buscar histórico da conversa (últimas 20 mensagens)
+    const { rows: historico } = await pool.query(
+      'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em DESC LIMIT 20',
+      [id]
+    );
+
+    // Buscar config da empresa
+    const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const config = {};
+    configRows.forEach(r => { config[r.chave] = r.valor; });
+
+    // Buscar produtos disponíveis
+    const { rows: produtos } = await pool.query(
+      'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+    );
+
+    const resposta = await agente.responder({
+      mensagem: mensagem.trim(),
+      historico: historico.reverse(),
+      config,
+      produtos,
+    });
+
+    res.json(resposta);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.post('/api/agente/testar', authMiddleware, async (req, res) => {
+  try {
+    const { mensagem } = req.body;
+    if (!mensagem?.trim()) return res.status(400).json({ erro: 'Mensagem é obrigatória.' });
+
+    const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const config = {};
+    configRows.forEach(r => { config[r.chave] = r.valor; });
+
+    const { rows: produtos } = await pool.query(
+      'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+    );
+
+    const resposta = await agente.responder({
+      mensagem: mensagem.trim(),
+      historico: [],
+      config,
+      produtos,
+    });
+
+    res.json(resposta);
   } catch (err) {
     erroInterno(res, err);
   }
