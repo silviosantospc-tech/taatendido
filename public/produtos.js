@@ -112,10 +112,27 @@ function renderCardEditando(p) {
     </div>`;
 }
 
+// ── Carregar produtos da API ──────────────────────────────
+async function carregarProdutos() {
+  const lista = document.getElementById('listaProdutos');
+  try {
+    const res = await Auth.fetch('/api/produtos');
+    if (!res || !res.ok) {
+      lista.innerHTML = '<p style="color:#ef4444;font-size:.9rem">Erro ao carregar produtos. Recarregue a página.</p>';
+      return;
+    }
+    produtos = await res.json();
+    renderProdutos();
+  } catch (err) {
+    console.error('Erro ao carregar produtos:', err);
+    lista.innerHTML = '<p style="color:#ef4444;font-size:.9rem">Erro de conexão. Recarregue a página.</p>';
+  }
+}
+
+// ── Edição inline ─────────────────────────────────────────
 function iniciarEdicao(id) {
   editandoId = id;
   renderProdutos();
-  // Foca no campo nome
   setTimeout(() => document.getElementById('edit_nome')?.focus(), 50);
 }
 
@@ -137,7 +154,6 @@ async function salvarEdicao(id) {
       method: 'PATCH',
       body: JSON.stringify({ nome, categoria, preco: preco || null, descricao }),
     });
-
     if (res && res.ok) {
       const atualizado = await res.json();
       produtos = produtos.map(p => p.id === id ? atualizado : p);
@@ -154,6 +170,7 @@ async function salvarEdicao(id) {
   }
 }
 
+// ── Trocar foto ───────────────────────────────────────────
 async function trocarFoto(event, id) {
   const file = event.target.files[0];
   if (!file) return;
@@ -184,6 +201,7 @@ async function trocarFoto(event, id) {
   }
 }
 
+// ── Ativar / Desativar ────────────────────────────────────
 async function toggleDisponivel(id, disponivel) {
   try {
     const res = await Auth.fetch(`/api/produtos/${id}/disponivel`, {
@@ -202,6 +220,7 @@ async function toggleDisponivel(id, disponivel) {
   }
 }
 
+// ── Excluir ───────────────────────────────────────────────
 async function excluirProduto(id) {
   if (!confirm('Remover este produto do cardápio?')) return;
   try {
@@ -218,7 +237,7 @@ async function excluirProduto(id) {
   }
 }
 
-// Prévia da foto no formulário
+// ── Prévia de foto no formulário ──────────────────────────
 document.getElementById('prodFoto').addEventListener('change', e => {
   const file = e.target.files[0];
   const preview = document.getElementById('previewFoto');
@@ -231,7 +250,7 @@ document.getElementById('prodFoto').addEventListener('change', e => {
   }
 });
 
-// Formulário de novo produto
+// ── Formulário de novo produto ────────────────────────────
 document.getElementById('formProduto').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = document.getElementById('btnAdicionarProduto');
@@ -286,4 +305,5 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
   }
 });
 
+// ── Inicializar ───────────────────────────────────────────
 carregarProdutos();

@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const multer = require('multer');
-const Jimp = require('jimp');
 const fs = require('fs');
 const crypto = require('crypto');
 
@@ -499,7 +498,8 @@ app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, 
     const nome = crypto.randomBytes(12).toString('hex') + '.jpg';
     const destino = path.join(UPLOADS_DIR, nome);
 
-    // Redimensiona para 800×800 cortando no centro
+    // Carrega jimp sob demanda para não travar o servidor na inicialização
+    const Jimp = require('jimp');
     const imagem = await Jimp.read(req.file.buffer);
     const lado = Math.min(imagem.width, imagem.height);
     await imagem
