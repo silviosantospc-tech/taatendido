@@ -50,6 +50,16 @@ function cardNormal(p) {
          <svg viewBox="0 0 24 24" style="width:22px;height:22px" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
        </div>`;
 
+  /* Botão Foto: span visual + input file sobreposto (sem JS para abrir) */
+  const btnFoto = `
+    <div style="position:relative;display:inline-flex">
+      <span class="secondary-button" style="padding:5px 10px;font-size:.8rem;pointer-events:none">Foto</span>
+      <input type="file" accept="image/jpeg,image/png,image/webp"
+        data-action="foto" data-id="${p.id}"
+        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"
+        title="Selecionar foto">
+    </div>`;
+
   return `
     <div class="reply-card" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
       ${thumb}
@@ -64,8 +74,7 @@ function cardNormal(p) {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
           data-action="editar" data-id="${p.id}">Editar</button>
-        <label for="fotoInputGlobal" class="secondary-button" style="padding:5px 10px;font-size:.8rem;cursor:pointer"
-          data-fotoid="${p.id}">Foto</label>
+        ${btnFoto}
         <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
           data-action="toggle" data-id="${p.id}" data-disponivel="${p.disponivel}">
           ${p.disponivel ? 'Desativar' : 'Ativar'}
@@ -111,16 +120,44 @@ function cardEditando(p) {
     </div>`;
 }
 
-/* ── Captura id do produto antes do label abrir o seletor ── */
-document.getElementById('listaProdutos').addEventListener('mousedown', function(e) {
-  const lbl = e.target.closest('[data-fotoid]');
-  if (lbl) _fotoTargetId = parseInt(lbl.dataset.fotoid, 10);
+/* ── Upload de foto via input sobreposto ao botão ────── */
+document.getElementById('listaProdutos').addEventListener('change', async function(e) {
+  const input = e.target.closest('input[data-action="foto"]');
+  if (!input) return;
+
+  const id   = parseInt(input.dataset.id, 10);
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ''; // permite re-selecionar o mesmo arquivo
+
+  const form = new FormData();
+  form.append('foto', file);
+  try {
+    const token = localStorage.getItem('ta_token');
+    const up = await fetch('/api/upload/foto', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: form,
+    });
+    if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
+    const { url } = await up.json();
+    const pr = await Auth.fetch('/api/produtos/' + id + '/foto', {
+      method: 'PATCH',
+      body: JSON.stringify({ foto_url: url }),
+    });
+    if (pr && pr.ok) {
+      const atualizado = await pr.json();
+      produtos = produtos.map(p => p.id === id ? atualizado : p);
+      renderProdutos();
+      toast('Foto atualizada!', 'success');
+    }
+  } catch { toast('Erro ao atualizar foto.', 'error'); }
 });
 
-/* ── Event delegation — UM listener para tudo ────────── */
+/* ── Event delegation — cliques nos botões da lista ─── */
 document.getElementById('listaProdutos').addEventListener('click', async function(e) {
   const btn = e.target.closest('[data-action]');
-  if (!btn) return;
+  if (!btn || btn.tagName === 'INPUT') return; // ignora os inputs file
 
   const action = btn.dataset.action;
   const id     = parseInt(btn.dataset.id, 10);
@@ -264,38 +301,6 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar';
   }
-});
-
-/* ── Input global para foto de produto existente ─────── */
-let _fotoTargetId = null;
-document.getElementById('fotoInputGlobal').addEventListener('change', async function() {
-  const file = this.files[0];
-  const id   = _fotoTargetId;
-  if (!file || !id) return;
-  this.value = ''; // limpa para permitir re-upload do mesmo arquivo
-
-  const form = new FormData();
-  form.append('foto', file);
-  try {
-    const token = localStorage.getItem('ta_token');
-    const up = await fetch('/api/upload/foto', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-      body: form,
-    });
-    if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
-    const { url } = await up.json();
-    const pr = await Auth.fetch('/api/produtos/' + id + '/foto', {
-      method: 'PATCH',
-      body: JSON.stringify({ foto_url: url }),
-    });
-    if (pr && pr.ok) {
-      const atualizado = await pr.json();
-      produtos = produtos.map(p => p.id === id ? atualizado : p);
-      renderProdutos();
-      toast('Foto atualizada!', 'success');
-    }
-  } catch { toast('Erro ao atualizar foto.', 'error'); }
 });
 
 /* ── Init ────────────────────────────────────────────── */
