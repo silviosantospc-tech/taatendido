@@ -86,9 +86,8 @@ async function responder({ mensagem, historico, config, produtos }) {
     throw new Error('GEMINI_API_KEY não configurada.');
   }
 
-  // gemini-2.0-flash-lite é o mais rápido e estável no tier gratuito
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-lite',
+    model: 'gemini-2.0-flash',
     systemInstruction: construirSystemPrompt(config, produtos),
   });
 
