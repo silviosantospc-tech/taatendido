@@ -3,25 +3,24 @@
 let produtos = [];
 let editandoId = null;
 
-function formatarPreco(preco) {
+function fmt(preco) {
   if (!preco && preco !== 0) return '';
   return 'R$ ' + parseFloat(preco).toFixed(2).replace('.', ',');
 }
 
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/* ── Render ──────────────────────────────────────────── */
 function renderProdutos() {
-  const lista = document.getElementById('listaProdutos');
+  const lista    = document.getElementById('listaProdutos');
   const contador = document.getElementById('contadorProdutos');
 
   if (!produtos.length) {
-    lista.innerHTML = '<p style="color:var(--text-muted);font-size:.9rem;padding:8px 0">Nenhum produto cadastrado ainda. Adicione o primeiro item acima.</p>';
+    lista.innerHTML = '<p style="color:var(--text-muted);font-size:.9rem;padding:8px 0">Nenhum produto cadastrado. Adicione o primeiro item acima.</p>';
     contador.textContent = '0 produtos';
     return;
   }
@@ -37,55 +36,61 @@ function renderProdutos() {
 
   lista.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
     <div style="margin-bottom:24px">
-      <h3 style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:0 0 10px">${escHtml(cat)}</h3>
+      <h3 style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:0 0 10px">${esc(cat)}</h3>
       <div style="display:flex;flex-direction:column;gap:8px">
-        ${itens.map(p => editandoId === p.id ? renderCardEditando(p) : renderCard(p)).join('')}
+        ${itens.map(p => editandoId === p.id ? cardEditando(p) : cardNormal(p)).join('')}
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function renderCard(p) {
-  const fotoThumb = p.foto_url
-    ? `<img src="${escHtml(p.foto_url)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1.5px solid var(--border)">`
-    : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2,#f1f5f9);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:22px;height:22px;color:var(--text-muted)" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+function cardNormal(p) {
+  const thumb = p.foto_url
+    ? `<img src="${esc(p.foto_url)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1.5px solid var(--border)">`
+    : `<div style="width:56px;height:56px;border-radius:8px;background:#f1f5f9;border:1.5px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#94a3b8">
+         <svg viewBox="0 0 24 24" style="width:22px;height:22px" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+       </div>`;
 
   return `
-    <input type="file" id="fi_${p.id}" accept="image/jpeg,image/png,image/webp" style="display:none">
     <div class="reply-card" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
-      ${fotoThumb}
+      ${thumb}
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <strong style="font-size:.95rem">${escHtml(p.nome)}</strong>
-          ${p.preco ? `<span style="font-size:.875rem;color:var(--primary,#22c55e);font-weight:600">${formatarPreco(p.preco)}</span>` : ''}
+          <strong>${esc(p.nome)}</strong>
+          ${p.preco ? `<span style="color:#22c55e;font-weight:600;font-size:.875rem">${fmt(p.preco)}</span>` : ''}
           ${!p.disponivel ? '<span class="tag tag-muted" style="font-size:.75rem">Indisponível</span>' : ''}
         </div>
-        ${p.descricao ? `<p style="font-size:.85rem;color:var(--text-muted);margin:2px 0 0">${escHtml(p.descricao)}</p>` : ''}
+        ${p.descricao ? `<p style="font-size:.85rem;color:var(--text-muted);margin:2px 0 0">${esc(p.descricao)}</p>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="iniciarEdicao(${p.id})">Editar</button>
-        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="abrirFoto(${p.id})">Foto</button>
-        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="toggleDisponivel(${p.id},${!p.disponivel})">${p.disponivel ? 'Desativar' : 'Ativar'}</button>
-        <button class="icon-btn" style="color:#ef4444;width:32px;height:32px;border-radius:6px;border:1.5px solid #fecaca;background:#fff5f5" onclick="excluirProduto(${p.id})">
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
+          data-action="editar" data-id="${p.id}">Editar</button>
+        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
+          data-action="foto" data-id="${p.id}">Foto</button>
+        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
+          data-action="toggle" data-id="${p.id}" data-disponivel="${p.disponivel}">
+          ${p.disponivel ? 'Desativar' : 'Ativar'}
+        </button>
+        <button style="color:#ef4444;width:32px;height:32px;border-radius:6px;border:1.5px solid #fecaca;background:#fff5f5;cursor:pointer;display:flex;align-items:center;justify-content:center"
+          data-action="excluir" data-id="${p.id}">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;pointer-events:none"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div>
     </div>`;
 }
 
-function renderCardEditando(p) {
+function cardEditando(p) {
   return `
-    <div class="reply-card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border:2px solid var(--primary,#22c55e)" data-id="${p.id}">
-      <strong style="font-size:.85rem;color:var(--primary,#22c55e)">Editando produto</strong>
+    <div class="reply-card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border:2px solid #22c55e">
+      <strong style="font-size:.85rem;color:#22c55e">Editando produto</strong>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500">
           Nome *
-          <input id="edit_nome" type="text" value="${escHtml(p.nome)}" maxlength="200"
+          <input id="edit_nome" type="text" value="${esc(p.nome)}" maxlength="200"
             style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font:inherit">
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500">
           Categoria
-          <input id="edit_categoria" type="text" value="${escHtml(p.categoria || '')}" maxlength="100"
+          <input id="edit_categoria" type="text" value="${esc(p.categoria || '')}" maxlength="100"
             style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font:inherit">
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500">
@@ -95,169 +100,161 @@ function renderCardEditando(p) {
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500">
           Descrição
-          <input id="edit_descricao" type="text" value="${escHtml(p.descricao || '')}" maxlength="500"
+          <input id="edit_descricao" type="text" value="${esc(p.descricao || '')}" maxlength="500"
             style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font:inherit">
         </label>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="secondary-button" onclick="cancelarEdicao()">Cancelar</button>
-        <button class="primary-button" onclick="salvarEdicao(${p.id})">Salvar</button>
+        <button class="secondary-button" data-action="cancelar">Cancelar</button>
+        <button class="primary-button" data-action="salvar" data-id="${p.id}">Salvar</button>
       </div>
     </div>`;
 }
 
-// ── Carregar produtos da API ──────────────────────────────
+/* ── Event delegation — UM listener para tudo ────────── */
+document.getElementById('listaProdutos').addEventListener('click', async function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+
+  const action = btn.dataset.action;
+  const id     = parseInt(btn.dataset.id, 10);
+
+  if (action === 'editar') {
+    editandoId = id;
+    renderProdutos();
+    setTimeout(() => document.getElementById('edit_nome')?.focus(), 50);
+    return;
+  }
+
+  if (action === 'cancelar') {
+    editandoId = null;
+    renderProdutos();
+    return;
+  }
+
+  if (action === 'salvar') {
+    const nome      = document.getElementById('edit_nome')?.value.trim();
+    const categoria = document.getElementById('edit_categoria')?.value.trim();
+    const preco     = document.getElementById('edit_preco')?.value;
+    const descricao = document.getElementById('edit_descricao')?.value.trim();
+    if (!nome) { toast('Nome é obrigatório.', 'error'); return; }
+    try {
+      const res = await Auth.fetch('/api/produtos/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({ nome, categoria, preco: preco || null, descricao }),
+      });
+      if (res && res.ok) {
+        produtos = produtos.map(p => p.id === id ? await res.json() : p);
+        // Re-fetch para ter dados frescos
+        const r2 = await Auth.fetch('/api/produtos/' + id);
+        // Ou simplesmente atualizar com o que o servidor retornou
+        editandoId = null;
+        await carregarProdutos();
+        toast('Produto atualizado!', 'success');
+      } else {
+        const d = await res?.json().catch(() => ({}));
+        toast(d?.erro || 'Erro ao salvar.', 'error');
+      }
+    } catch { toast('Erro de conexão.', 'error'); }
+    return;
+  }
+
+  if (action === 'foto') {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append('foto', file);
+      try {
+        const token = localStorage.getItem('ta_token');
+        const up = await fetch('/api/upload/foto', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+          body: form,
+        });
+        if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
+        const { url } = await up.json();
+        const pr = await Auth.fetch('/api/produtos/' + id + '/foto', {
+          method: 'PATCH',
+          body: JSON.stringify({ foto_url: url }),
+        });
+        if (pr && pr.ok) {
+          const atualizado = await pr.json();
+          produtos = produtos.map(p => p.id === id ? atualizado : p);
+          renderProdutos();
+          toast('Foto atualizada!', 'success');
+        }
+      } catch { toast('Erro ao atualizar foto.', 'error'); }
+    };
+    input.click();
+    return;
+  }
+
+  if (action === 'toggle') {
+    const disponivel = btn.dataset.disponivel === 'true';
+    try {
+      const res = await Auth.fetch('/api/produtos/' + id + '/disponivel', {
+        method: 'PATCH',
+        body: JSON.stringify({ disponivel: !disponivel }),
+      });
+      if (res && res.ok) {
+        const atualizado = await res.json();
+        produtos = produtos.map(p => p.id === id ? atualizado : p);
+        renderProdutos();
+        toast(!disponivel ? 'Produto ativado.' : 'Produto desativado.', 'success');
+      }
+    } catch { toast('Erro ao atualizar produto.', 'error'); }
+    return;
+  }
+
+  if (action === 'excluir') {
+    if (!confirm('Remover este produto do cardápio?')) return;
+    try {
+      const res = await Auth.fetch('/api/produtos/' + id, { method: 'DELETE' });
+      if (res && res.ok) {
+        produtos = produtos.filter(p => p.id !== id);
+        if (editandoId === id) editandoId = null;
+        renderProdutos();
+        toast('Produto removido.', 'success');
+      }
+    } catch { toast('Erro ao remover produto.', 'error'); }
+    return;
+  }
+});
+
+/* ── Carregar produtos ───────────────────────────────── */
 async function carregarProdutos() {
   const lista = document.getElementById('listaProdutos');
   try {
     const res = await Auth.fetch('/api/produtos');
     if (!res || !res.ok) {
-      lista.innerHTML = '<p style="color:#ef4444;font-size:.9rem">Erro ao carregar produtos. Recarregue a página.</p>';
+      lista.innerHTML = '<p style="color:#ef4444;font-size:.9rem">Erro ao carregar. Recarregue a página.</p>';
       return;
     }
     produtos = await res.json();
     renderProdutos();
-  } catch (err) {
-    console.error('Erro ao carregar produtos:', err);
+  } catch {
     lista.innerHTML = '<p style="color:#ef4444;font-size:.9rem">Erro de conexão. Recarregue a página.</p>';
   }
 }
 
-// ── Edição inline ─────────────────────────────────────────
-function iniciarEdicao(id) {
-  editandoId = id;
-  renderProdutos();
-  setTimeout(() => document.getElementById('edit_nome')?.focus(), 50);
-}
-
-function cancelarEdicao() {
-  editandoId = null;
-  renderProdutos();
-}
-
-async function salvarEdicao(id) {
-  const nome      = document.getElementById('edit_nome')?.value.trim();
-  const categoria = document.getElementById('edit_categoria')?.value.trim();
-  const preco     = document.getElementById('edit_preco')?.value;
-  const descricao = document.getElementById('edit_descricao')?.value.trim();
-
-  if (!nome) { toast('Nome é obrigatório.', 'error'); return; }
-
-  try {
-    const res = await Auth.fetch(`/api/produtos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ nome, categoria, preco: preco || null, descricao }),
-    });
-    if (res && res.ok) {
-      const atualizado = await res.json();
-      produtos = produtos.map(p => p.id === id ? atualizado : p);
-      editandoId = null;
-      renderProdutos();
-      toast('Produto atualizado!', 'success');
-    } else {
-      const data = await res?.json().catch(() => ({}));
-      toast(data?.erro || 'Erro ao salvar.', 'error');
-    }
-  } catch (err) {
-    console.error(err);
-    toast('Erro de conexão.', 'error');
-  }
-}
-
-// ── Abrir seletor de arquivo para foto ────────────────────
-function abrirFoto(id) {
-  const input = document.getElementById('fi_' + id);
-  if (!input) return;
-  input.onchange = (e) => trocarFoto(e, id);
-  input.click();
-}
-
-// ── Trocar foto ───────────────────────────────────────────
-async function trocarFoto(event, id) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const form = new FormData();
-  form.append('foto', file);
-  try {
-    const token = localStorage.getItem('ta_token');
-    const upRes = await fetch('/api/upload/foto', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!upRes.ok) { toast('Erro ao enviar foto.', 'error'); return; }
-    const { url } = await upRes.json();
-    const pRes = await Auth.fetch(`/api/produtos/${id}/foto`, {
-      method: 'PATCH',
-      body: JSON.stringify({ foto_url: url }),
-    });
-    if (pRes && pRes.ok) {
-      const atualizado = await pRes.json();
-      produtos = produtos.map(p => p.id === id ? atualizado : p);
-      renderProdutos();
-      toast('Foto atualizada!', 'success');
-    }
-  } catch (err) {
-    console.error(err);
-    toast('Erro ao atualizar foto.', 'error');
-  }
-}
-
-// ── Ativar / Desativar ────────────────────────────────────
-async function toggleDisponivel(id, disponivel) {
-  try {
-    const res = await Auth.fetch(`/api/produtos/${id}/disponivel`, {
-      method: 'PATCH',
-      body: JSON.stringify({ disponivel }),
-    });
-    if (res && res.ok) {
-      const atualizado = await res.json();
-      produtos = produtos.map(p => p.id === id ? atualizado : p);
-      renderProdutos();
-      toast(disponivel ? 'Produto ativado.' : 'Produto desativado.', 'success');
-    }
-  } catch (err) {
-    console.error(err);
-    toast('Erro ao atualizar produto.', 'error');
-  }
-}
-
-// ── Excluir ───────────────────────────────────────────────
-async function excluirProduto(id) {
-  if (!confirm('Remover este produto do cardápio?')) return;
-  try {
-    const res = await Auth.fetch(`/api/produtos/${id}`, { method: 'DELETE' });
-    if (res && res.ok) {
-      produtos = produtos.filter(p => p.id !== id);
-      if (editandoId === id) editandoId = null;
-      renderProdutos();
-      toast('Produto removido.', 'success');
-    }
-  } catch (err) {
-    console.error(err);
-    toast('Erro ao remover produto.', 'error');
-  }
-}
-
-// ── Prévia de foto no formulário ──────────────────────────
+/* ── Prévia de foto no formulário ────────────────────── */
 document.getElementById('prodFoto').addEventListener('change', e => {
   const file = e.target.files[0];
   const preview = document.getElementById('previewFoto');
-  const img = document.getElementById('imgPreview');
-  if (file) {
-    img.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
-  } else {
-    preview.style.display = 'none';
-  }
+  const img     = document.getElementById('imgPreview');
+  if (file) { img.src = URL.createObjectURL(file); preview.style.display = 'block'; }
+  else        { preview.style.display = 'none'; }
 });
 
-// ── Formulário de novo produto ────────────────────────────
+/* ── Formulário de novo produto ──────────────────────── */
 document.getElementById('formProduto').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = document.getElementById('btnAdicionarProduto');
-  btn.disabled = true;
-  btn.textContent = 'Adicionando…';
+  btn.disabled = true; btn.textContent = 'Adicionando…';
 
   const nome      = document.getElementById('prodNome').value.trim();
   const categoria = document.getElementById('prodCategoria').value.trim();
@@ -271,15 +268,10 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
       const form = new FormData();
       form.append('foto', fotoFile);
       const token = localStorage.getItem('ta_token');
-      const upRes = await fetch('/api/upload/foto', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
+      const up = await fetch('/api/upload/foto', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form,
       });
-      if (upRes.ok) {
-        const data = await upRes.json();
-        foto_url = data.url;
-      }
+      if (up.ok) foto_url = (await up.json()).url;
     }
 
     const res = await Auth.fetch('/api/produtos', {
@@ -288,24 +280,21 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
     });
 
     if (res && res.ok) {
-      const novo = await res.json();
-      produtos.push(novo);
+      produtos.push(await res.json());
       renderProdutos();
       e.target.reset();
       document.getElementById('previewFoto').style.display = 'none';
       toast('Produto adicionado!', 'success');
     } else {
-      const data = await res.json().catch(() => ({}));
-      toast(data.erro || 'Erro ao adicionar produto.', 'error');
+      const d = await res.json().catch(() => ({}));
+      toast(d.erro || 'Erro ao adicionar.', 'error');
     }
-  } catch (err) {
-    console.error(err);
-    toast('Erro de conexão.', 'error');
-  } finally {
+  } catch { toast('Erro de conexão.', 'error'); }
+  finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar';
   }
 });
 
-// ── Inicializar ───────────────────────────────────────────
+/* ── Init ────────────────────────────────────────────── */
 carregarProdutos();
