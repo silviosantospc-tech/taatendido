@@ -7,6 +7,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Opções globais de requisição — força endpoint v1 (suporta modelos mais recentes)
+const REQUEST_OPTS = { apiVersion: 'v1alpha' };
+
 /**
  * Constrói o prompt de sistema com as informações do negócio
  */
@@ -86,10 +89,13 @@ async function responder({ mensagem, historico, config, produtos }) {
     throw new Error('GEMINI_API_KEY não configurada.');
   }
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-preview-04-17',
-    systemInstruction: construirSystemPrompt(config, produtos),
-  });
+  const model = genAI.getGenerativeModel(
+    {
+      model: 'gemini-2.5-flash',
+      systemInstruction: construirSystemPrompt(config, produtos),
+    },
+    REQUEST_OPTS
+  );
 
   // Converter histórico para o formato Gemini
   const history = historico.map(msg => ({
