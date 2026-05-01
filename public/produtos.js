@@ -158,36 +158,8 @@ document.getElementById('listaProdutos').addEventListener('click', async functio
   }
 
   if (action === 'foto') {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/jpeg,image/png,image/webp';
-    input.onchange = async () => {
-      const file = input.files[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append('foto', file);
-      try {
-        const token = localStorage.getItem('ta_token');
-        const up = await fetch('/api/upload/foto', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token },
-          body: form,
-        });
-        if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
-        const { url } = await up.json();
-        const pr = await Auth.fetch('/api/produtos/' + id + '/foto', {
-          method: 'PATCH',
-          body: JSON.stringify({ foto_url: url }),
-        });
-        if (pr && pr.ok) {
-          const atualizado = await pr.json();
-          produtos = produtos.map(p => p.id === id ? atualizado : p);
-          renderProdutos();
-          toast('Foto atualizada!', 'success');
-        }
-      } catch { toast('Erro ao atualizar foto.', 'error'); }
-    };
-    input.click();
+    _fotoTargetId = id;
+    document.getElementById('fotoInputGlobal').click();
     return;
   }
 
@@ -292,6 +264,38 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar';
   }
+});
+
+/* ── Input global para foto de produto existente ─────── */
+let _fotoTargetId = null;
+document.getElementById('fotoInputGlobal').addEventListener('change', async function() {
+  const file = this.files[0];
+  const id   = _fotoTargetId;
+  if (!file || !id) return;
+  this.value = ''; // limpa para permitir re-upload do mesmo arquivo
+
+  const form = new FormData();
+  form.append('foto', file);
+  try {
+    const token = localStorage.getItem('ta_token');
+    const up = await fetch('/api/upload/foto', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: form,
+    });
+    if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
+    const { url } = await up.json();
+    const pr = await Auth.fetch('/api/produtos/' + id + '/foto', {
+      method: 'PATCH',
+      body: JSON.stringify({ foto_url: url }),
+    });
+    if (pr && pr.ok) {
+      const atualizado = await pr.json();
+      produtos = produtos.map(p => p.id === id ? atualizado : p);
+      renderProdutos();
+      toast('Foto atualizada!', 'success');
+    }
+  } catch { toast('Erro ao atualizar foto.', 'error'); }
 });
 
 /* ── Init ────────────────────────────────────────────── */
