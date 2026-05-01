@@ -1,3 +1,5 @@
+function toast(mensagem, tipo = 'success') { showToast(mensagem, tipo); }
+
 function showToast(mensagem, tipo = 'success') {
   const toast = document.createElement('div');
   toast.className = `toast toast-${tipo}`;
