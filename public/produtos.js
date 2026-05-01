@@ -144,12 +144,10 @@ document.getElementById('listaProdutos').addEventListener('click', async functio
         body: JSON.stringify({ nome, categoria, preco: preco || null, descricao }),
       });
       if (res && res.ok) {
-        produtos = produtos.map(p => p.id === id ? await res.json() : p);
-        // Re-fetch para ter dados frescos
-        const r2 = await Auth.fetch('/api/produtos/' + id);
-        // Ou simplesmente atualizar com o que o servidor retornou
+        const atualizado = await res.json();
+        produtos = produtos.map(p => p.id === id ? atualizado : p);
         editandoId = null;
-        await carregarProdutos();
+        renderProdutos();
         toast('Produto atualizado!', 'success');
       } else {
         const d = await res?.json().catch(() => ({}));
