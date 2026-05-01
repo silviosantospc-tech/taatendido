@@ -6,6 +6,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const multer = require('multer');
+const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -176,9 +179,12 @@ async function initDB() {
       descricao TEXT,
       preco NUMERIC(10,2),
       categoria TEXT,
+      foto_url TEXT,
       disponivel BOOLEAN DEFAULT TRUE,
       criado_em TIMESTAMP DEFAULT NOW()
     );
+
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS foto_url TEXT;
   `);
   console.log('Banco de dados inicializado com sucesso.');
 }
@@ -472,6 +478,32 @@ app.post('/api/empresa/config', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Upload de fotos ───────────────────────────────────────
+const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const nome = crypto.randomBytes(12).toString('hex') + ext;
+      cb(null, nome);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB
+  fileFilter: (req, file, cb) => {
+    const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
+    cb(ok ? null : new Error('Formato inválido. Use JPG, PNG ou WebP.'), ok);
+  },
+});
+
+app.post('/api/upload/foto', authMiddleware, upload.single('foto'), (req, res) => {
+  if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ url });
+});
+
 // ── Produtos ──────────────────────────────────────────────
 app.get('/api/produtos', authMiddleware, async (req, res) => {
   try {
@@ -484,15 +516,33 @@ app.get('/api/produtos', authMiddleware, async (req, res) => {
 
 app.post('/api/produtos', authMiddleware, async (req, res) => {
   try {
-    const { nome, descricao, preco, categoria } = req.body;
+    const { nome, descricao, preco, categoria, foto_url } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
     const precoNum = preco ? parseFloat(preco) : null;
     if (preco && isNaN(precoNum)) return res.status(400).json({ erro: 'Preço inválido.' });
+    const fotoFinal = foto_url?.startsWith('/uploads/') ? foto_url : null;
     const { rows } = await pool.query(
-      'INSERT INTO produtos (nome, descricao, preco, categoria) VALUES ($1, $2, $3, $4) RETURNING *',
-      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100)]
+      'INSERT INTO produtos (nome, descricao, preco, categoria, foto_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), fotoFinal]
     );
     res.status(201).json(rows[0]);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.patch('/api/produtos/:id/foto', authMiddleware, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+    const { foto_url } = req.body;
+    const fotoFinal = foto_url?.startsWith('/uploads/') ? foto_url : null;
+    const { rows } = await pool.query(
+      'UPDATE produtos SET foto_url=$1 WHERE id=$2 RETURNING *',
+      [fotoFinal, id]
+    );
+    if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    res.json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }

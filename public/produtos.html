@@ -92,6 +92,16 @@
               <span>Descrição</span>
               <input type="text" id="prodDescricao" placeholder="Ex: Hambúrguer artesanal com queijo e bacon" maxlength="500">
             </label>
+            <label>
+              <span>Foto do produto</span>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <input type="file" id="prodFoto" accept="image/jpeg,image/png,image/webp" style="font:inherit;padding:8px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer">
+                <div id="previewFoto" style="display:none">
+                  <img id="imgPreview" src="" alt="Prévia" style="max-height:120px;border-radius:8px;border:1.5px solid var(--border)">
+                </div>
+                <span style="font-size:.8rem;color:var(--text-muted)">JPG, PNG ou WebP · máx. 3 MB</span>
+              </div>
+            </label>
             <div style="display:flex;justify-content:flex-end">
               <button class="primary-button" type="submit" id="btnAdicionarProduto">
                 <svg viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
