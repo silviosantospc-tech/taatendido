@@ -176,6 +176,15 @@ function validarEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function validarId(id) {
+  const n = parseInt(id, 10);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// Hash dummy pré-gerado para evitar timing attack no login
+// (mesmo custo que o hash real, sem revelar se o email existe)
+const DUMMY_HASH = '$2b$12$KIXBc5P2nkxJ7nCc5S8Np.kULaXexPBiT5F5L5R3JwK6NxH1zGxSe';
+
 // ── Auth: Registro ────────────────────────────────────────
 app.post('/api/auth/registro', async (req, res) => {
   try {
@@ -227,8 +236,7 @@ app.post('/api/auth/login', async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM usuarios WHERE email=$1', [email.toLowerCase()]);
 
     // Mesmo tempo de resposta se o usuário não existir (evita user enumeration)
-    const dummy = '$2b$12$invalido.hash.para.comparacao.segura.evitar.timing';
-    const hash = rows.length ? rows[0].senha_hash : dummy;
+    const hash = rows.length ? rows[0].senha_hash : DUMMY_HASH;
     const valido = await bcrypt.compare(senha, hash);
 
     if (!rows.length || !valido)
@@ -259,7 +267,8 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // ── Contatos ──────────────────────────────────────────────
 app.get('/api/contatos', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM contatos ORDER BY criado_em DESC');
+    const limite = Math.min(parseInt(req.query.limite) || 200, 500);
+    const { rows } = await pool.query('SELECT * FROM contatos ORDER BY criado_em DESC LIMIT $1', [limite]);
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -283,12 +292,14 @@ app.post('/api/contatos', authMiddleware, async (req, res) => {
 // ── Conversas ─────────────────────────────────────────────
 app.get('/api/conversas', authMiddleware, async (req, res) => {
   try {
+    const limite = Math.min(parseInt(req.query.limite) || 100, 300);
     const { rows } = await pool.query(`
       SELECT c.*, ct.nome as contato_nome, ct.telefone as contato_telefone
       FROM conversas c
       LEFT JOIN contatos ct ON c.contato_id = ct.id
       ORDER BY c.atualizado_em DESC
-    `);
+      LIMIT $1
+    `, [limite]);
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -311,6 +322,9 @@ app.post('/api/conversas', authMiddleware, async (req, res) => {
 
 app.patch('/api/conversas/:id/status', authMiddleware, async (req, res) => {
   try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+
     const { status } = req.body;
     const statusValidos = ['aberta', 'em-atendimento', 'aguardando', 'finalizada'];
     if (!statusValidos.includes(status))
@@ -318,7 +332,7 @@ app.patch('/api/conversas/:id/status', authMiddleware, async (req, res) => {
 
     const { rows } = await pool.query(
       'UPDATE conversas SET status=$1, atualizado_em=NOW() WHERE id=$2 RETURNING *',
-      [status, req.params.id]
+      [status, id]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Conversa não encontrada.' });
     res.json(rows[0]);
@@ -330,9 +344,13 @@ app.patch('/api/conversas/:id/status', authMiddleware, async (req, res) => {
 // ── Mensagens ─────────────────────────────────────────────
 app.get('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
   try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+
+    const limite = Math.min(parseInt(req.query.limite) || 200, 500);
     const { rows } = await pool.query(
-      'SELECT * FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC',
-      [req.params.id]
+      'SELECT * FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC LIMIT $2',
+      [id, limite]
     );
     res.json(rows);
   } catch (err) {
@@ -342,16 +360,21 @@ app.get('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
 
 app.post('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
   try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+
     const { tipo, conteudo } = req.body;
     if (!conteudo?.trim()) return res.status(400).json({ erro: 'Conteúdo é obrigatório.' });
+    if (conteudo.length > 5000) return res.status(400).json({ erro: 'Mensagem muito longa.' });
+
     const tiposValidos = ['received', 'sent'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'received';
 
     const { rows } = await pool.query(
       'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1, $2, $3) RETURNING *',
-      [req.params.id, tipoFinal, conteudo.trim()]
+      [id, tipoFinal, conteudo.trim()]
     );
-    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [req.params.id]);
+    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [id]);
     res.status(201).json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
@@ -384,7 +407,10 @@ app.post('/api/respostas', authMiddleware, async (req, res) => {
 
 app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [req.params.id]);
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID inválido.' });
+
+    const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [id]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Resposta não encontrada.' });
     res.json({ mensagem: 'Resposta removida.' });
   } catch (err) {
