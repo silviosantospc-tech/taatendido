@@ -46,14 +46,14 @@ function renderProdutos() {
 }
 
 function renderCard(p) {
+  const fotoThumb = p.foto_url
+    ? `<img src="${escHtml(p.foto_url)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1.5px solid var(--border)">`
+    : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2,#f1f5f9);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:22px;height:22px;color:var(--text-muted)" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+
   return `
-    <div class="reply-card" style="display:flex;align-items:center;gap:12px;padding:12px 16px" data-id="${p.id}">
-      ${p.foto_url
-        ? `<img src="${escHtml(p.foto_url)}" alt="${escHtml(p.nome)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1.5px solid var(--border)">`
-        : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2,#f1f5f9);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" style="width:22px;height:22px;color:var(--text-muted)" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          </div>`
-      }
+    <input type="file" id="fi_${p.id}" accept="image/jpeg,image/png,image/webp" style="display:none">
+    <div class="reply-card" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+      ${fotoThumb}
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <strong style="font-size:.95rem">${escHtml(p.nome)}</strong>
@@ -64,16 +64,10 @@ function renderCard(p) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="iniciarEdicao(${p.id})">Editar</button>
-        <label style="cursor:pointer" title="Trocar foto">
-          <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="trocarFoto(event, ${p.id})">
-          <span class="secondary-button" style="padding:5px 10px;font-size:.8rem;display:inline-flex;align-items:center;gap:4px">
-            <svg viewBox="0 0 24 24" style="width:12px;height:12px" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            Foto
-          </span>
-        </label>
-        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="toggleDisponivel(${p.id}, ${!p.disponivel})">${p.disponivel ? 'Desativar' : 'Ativar'}</button>
-        <button class="icon-btn" style="color:#ef4444;width:32px;height:32px;border-radius:6px;border:1.5px solid #fecaca;background:#fff5f5" aria-label="Excluir" onclick="excluirProduto(${p.id})">
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="abrirFoto(${p.id})">Foto</button>
+        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem" onclick="toggleDisponivel(${p.id},${!p.disponivel})">${p.disponivel ? 'Desativar' : 'Ativar'}</button>
+        <button class="icon-btn" style="color:#ef4444;width:32px;height:32px;border-radius:6px;border:1.5px solid #fecaca;background:#fff5f5" onclick="excluirProduto(${p.id})">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div>
     </div>`;
@@ -168,6 +162,14 @@ async function salvarEdicao(id) {
     console.error(err);
     toast('Erro de conexão.', 'error');
   }
+}
+
+// ── Abrir seletor de arquivo para foto ────────────────────
+function abrirFoto(id) {
+  const input = document.getElementById('fi_' + id);
+  if (!input) return;
+  input.onchange = (e) => trocarFoto(e, id);
+  input.click();
 }
 
 // ── Trocar foto ───────────────────────────────────────────
