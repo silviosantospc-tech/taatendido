@@ -64,8 +64,8 @@ function cardNormal(p) {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
           data-action="editar" data-id="${p.id}">Editar</button>
-        <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
-          data-action="foto" data-id="${p.id}">Foto</button>
+        <label for="fotoInputGlobal" class="secondary-button" style="padding:5px 10px;font-size:.8rem;cursor:pointer"
+          data-fotoid="${p.id}">Foto</label>
         <button class="secondary-button" style="padding:5px 10px;font-size:.8rem"
           data-action="toggle" data-id="${p.id}" data-disponivel="${p.disponivel}">
           ${p.disponivel ? 'Desativar' : 'Ativar'}
@@ -111,6 +111,12 @@ function cardEditando(p) {
     </div>`;
 }
 
+/* ── Captura id do produto antes do label abrir o seletor ── */
+document.getElementById('listaProdutos').addEventListener('mousedown', function(e) {
+  const lbl = e.target.closest('[data-fotoid]');
+  if (lbl) _fotoTargetId = parseInt(lbl.dataset.fotoid, 10);
+});
+
 /* ── Event delegation — UM listener para tudo ────────── */
 document.getElementById('listaProdutos').addEventListener('click', async function(e) {
   const btn = e.target.closest('[data-action]');
@@ -154,12 +160,6 @@ document.getElementById('listaProdutos').addEventListener('click', async functio
         toast(d?.erro || 'Erro ao salvar.', 'error');
       }
     } catch { toast('Erro de conexão.', 'error'); }
-    return;
-  }
-
-  if (action === 'foto') {
-    _fotoTargetId = id;
-    document.getElementById('fotoInputGlobal').click();
     return;
   }
 
