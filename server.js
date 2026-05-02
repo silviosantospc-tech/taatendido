@@ -671,6 +671,162 @@ app.post('/api/agente/testar', authMiddleware, async (req, res) => {
   }
 });
 
+// ── WhatsApp ──────────────────────────────────────────────
+const WA_TOKEN        = process.env.WHATSAPP_TOKEN;
+const WA_PHONE_ID     = process.env.WHATSAPP_PHONE_ID;
+const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+
+// Verificação do webhook (Meta chama ao cadastrar o URL)
+app.get('/api/whatsapp/webhook', (req, res) => {
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
+    console.log('[whatsapp] Webhook verificado com sucesso.');
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// Receber mensagens do WhatsApp
+app.post('/api/whatsapp/webhook', async (req, res) => {
+  res.sendStatus(200); // responde imediatamente para a Meta não reenviar
+
+  try {
+    const body = req.body;
+    if (body.object !== 'whatsapp_business_account') return;
+
+    const value = body.entry?.[0]?.changes?.[0]?.value;
+    if (!value?.messages?.[0]) return; // pode ser atualização de status
+
+    const msg      = value.messages[0];
+    const telefone = msg.from;                                   // ex: 5511999998888
+    const nome     = value.contacts?.[0]?.profile?.name || 'Cliente';
+
+    // Por enquanto processa apenas mensagens de texto
+    if (msg.type !== 'text') {
+      await enviarWhatsApp(telefone, 'Desculpe, ainda não consigo processar ' +
+        (msg.type === 'image' ? 'imagens' : 'esse tipo de mensagem') + '. Como posso ajudar?');
+      return;
+    }
+
+    const texto = msg.text.body.trim();
+    if (!texto) return;
+
+    console.log(`[whatsapp] ${nome} (${telefone}): ${texto.substring(0, 60)}`);
+    await processarMensagemWA({ telefone, nome, texto });
+
+  } catch (err) {
+    console.error('[whatsapp/webhook]', err.message);
+  }
+});
+
+async function processarMensagemWA({ telefone, nome, texto }) {
+  // 1. Buscar ou criar contato
+  let { rows: [contato] } = await pool.query(
+    'SELECT id FROM contatos WHERE telefone=$1 LIMIT 1', [telefone]
+  );
+  if (!contato) {
+    const ins = await pool.query(
+      'INSERT INTO contatos (nome, telefone) VALUES ($1,$2) RETURNING id',
+      [nome, telefone]
+    );
+    contato = ins.rows[0];
+  }
+
+  // 2. Buscar ou criar conversa aberta no canal WhatsApp
+  let { rows: [conversa] } = await pool.query(
+    `SELECT id FROM conversas
+     WHERE contato_id=$1 AND status='aberta' AND canal='whatsapp'
+     ORDER BY criado_em DESC LIMIT 1`,
+    [contato.id]
+  );
+  if (!conversa) {
+    const ins = await pool.query(
+      `INSERT INTO conversas (contato_id, status, canal) VALUES ($1,'aberta','whatsapp') RETURNING id`,
+      [contato.id]
+    );
+    conversa = ins.rows[0];
+  }
+
+  // 3. Salvar mensagem recebida
+  await pool.query(
+    'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1,$2,$3)',
+    [conversa.id, 'received', texto]
+  );
+
+  // 4. Buscar histórico recente
+  const { rows: historico } = await pool.query(
+    'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC',
+    [conversa.id]
+  );
+
+  // 5. Buscar config e produtos
+  const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+  const config = {};
+  configRows.forEach(r => { config[r.chave] = r.valor; });
+
+  const { rows: produtos } = await pool.query(
+    'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+  );
+
+  // 6. Chamar IA
+  const resposta = await agente.responder({ mensagem: texto, historico, config, produtos });
+
+  // 7. Salvar resposta
+  await pool.query(
+    'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1,$2,$3)',
+    [conversa.id, 'sent', resposta.texto]
+  );
+
+  // 8. Enviar resposta ao cliente
+  await enviarWhatsApp(telefone, resposta.texto);
+
+  // 9. Se a IA pediu escalação, marcar conversa para humano
+  if (resposta.escalar) {
+    await pool.query(
+      `UPDATE conversas SET status='escalada', atualizado_em=NOW() WHERE id=$1`,
+      [conversa.id]
+    );
+    console.log(`[whatsapp] Conversa ${conversa.id} escalada para humano.`);
+  } else {
+    await pool.query(
+      'UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [conversa.id]
+    );
+  }
+}
+
+async function enviarWhatsApp(telefone, texto) {
+  if (!WA_TOKEN || !WA_PHONE_ID) {
+    console.warn('[whatsapp] WHATSAPP_TOKEN ou WHATSAPP_PHONE_ID não configurados.');
+    return;
+  }
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: telefone,
+          type: 'text',
+          text: { body: texto },
+        }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[whatsapp] Erro ao enviar:', JSON.stringify(err));
+    }
+  } catch (err) {
+    console.error('[whatsapp] Falha na requisição:', err.message);
+  }
+}
+
 // ── Rota não encontrada ───────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada.' });
