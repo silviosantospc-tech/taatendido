@@ -54,7 +54,7 @@ function cardNormal(p) {
   const btnFoto = `
     <div style="position:relative;display:inline-flex">
       <span class="secondary-button" style="padding:5px 10px;font-size:.8rem;pointer-events:none">Foto</span>
-      <input type="file" accept="image/jpeg,image/png,image/webp"
+      <input type="file" accept="image/jpeg,image/png"
         data-action="foto" data-id="${p.id}"
         style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"
         title="Selecionar foto">

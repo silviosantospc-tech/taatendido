@@ -9,6 +9,7 @@ const helmet = require('helmet');
 const multer = require('multer');
 const fs = require('fs');
 const crypto = require('crypto');
+const Jimp = require('jimp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,7 +39,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'"],
+      scriptSrc:  ["'self'"],
       styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc:    ["'self'", "https://fonts.gstatic.com"],
       imgSrc:     ["'self'", "data:", "blob:"],
@@ -734,8 +735,8 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
-    cb(ok ? null : new Error('Formato inválido. Use JPG, PNG ou WebP.'), ok);
+    const ok = ['image/jpeg', 'image/png'].includes(file.mimetype);
+    cb(ok ? null : new Error('Formato invalido. Use JPG ou PNG.'), ok);
   },
 });
 
@@ -743,7 +744,6 @@ function detectarImagem(buffer) {
   if (!buffer || buffer.length < 12) return null;
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return { mime: 'image/jpeg', ext: '.jpg' };
   if (buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: '.png' };
-  if (buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') return { mime: 'image/webp', ext: '.webp' };
   return null;
 }
 
@@ -758,10 +758,12 @@ app.post('/api/upload/foto', authMiddleware, exigirAdmin, upload.single('foto'),
     // Garante que o diretório existe (pode ter sido apagado)
     await fs.promises.mkdir(UPLOADS_DIR, { recursive: true });
 
-    const nome    = crypto.randomBytes(12).toString('hex') + imagem.ext;
+    const nome    = crypto.randomBytes(12).toString('hex') + '.jpg';
     const destino = path.join(UPLOADS_DIR, nome);
 
-    await fs.promises.writeFile(destino, req.file.buffer);
+    const foto = await Jimp.read(req.file.buffer);
+    foto.scaleToFit(1600, 1600).quality(82);
+    await foto.writeAsync(destino);
     res.json({ url: `/uploads/${nome}` });
   } catch (err) {
     console.error('[upload/foto]', err);

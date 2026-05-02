@@ -55,3 +55,8 @@ const Auth = {
     window.location.href = 'login.html';
   }
 };
+
+document.addEventListener('click', (event) => {
+  const logout = event.target.closest('[data-logout]');
+  if (logout) Auth.logout();
+});
