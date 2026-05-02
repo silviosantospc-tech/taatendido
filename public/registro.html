@@ -31,6 +31,10 @@
             <input type="text" id="inputNome" placeholder="Seu nome" autocomplete="name" required>
           </label>
           <label>
+            <span>Nome da empresa</span>
+            <input type="text" id="inputEmpresa" placeholder="Ex: Lanchonete Sabor & Cia" autocomplete="organization" required>
+          </label>
+          <label>
             <span>Email</span>
             <input type="email" id="inputEmail" placeholder="seu@email.com.br" autocomplete="email" required>
           </label>
@@ -108,6 +112,7 @@
       const btn = this.querySelector('button');
       const erroMsg = document.getElementById('erroMsg');
       const nome = document.getElementById('inputNome').value.trim();
+      const empresa_nome = document.getElementById('inputEmpresa').value.trim();
       const email = document.getElementById('inputEmail').value.trim();
       const senha = document.getElementById('inputSenha').value;
       const confirmar = document.getElementById('inputConfirmar').value;
@@ -133,7 +138,7 @@
         const res = await fetch('/api/auth/registro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, email, senha })
+          body: JSON.stringify({ nome, empresa_nome, email, senha })
         });
         const data = await res.json();
 

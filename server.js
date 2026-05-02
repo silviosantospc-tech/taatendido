@@ -104,11 +104,24 @@ const pool = new Pool({
 });
 
 // ── Middleware de autenticação ────────────────────────────
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ erro: 'Token não fornecido.' });
   try {
-    req.usuario = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.empresa_id) {
+      req.usuario = payload;
+      return next();
+    }
+
+    const { rows } = await pool.query(
+      'SELECT id, email, papel, empresa_id FROM usuarios WHERE id=$1',
+      [payload.id]
+    );
+    if (!rows.length || !rows[0].empresa_id) {
+      return res.status(401).json({ erro: 'Usuario sem empresa vinculada.' });
+    }
+    req.usuario = rows[0];
     next();
   } catch {
     res.status(401).json({ erro: 'Token inválido ou expirado.' });
@@ -123,17 +136,31 @@ app.get('/api/health', (req, res) => {
 // ── Inicializar tabelas ───────────────────────────────────
 async function initDB() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS empresas (
+      id SERIAL PRIMARY KEY,
+      nome TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      status TEXT DEFAULT 'ativo',
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+
+    INSERT INTO empresas (nome, slug)
+    VALUES ('TáAtendido Demo', 'taatendido-demo')
+    ON CONFLICT (slug) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS usuarios (
       id SERIAL PRIMARY KEY,
       nome TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       senha_hash TEXT NOT NULL,
+      empresa_id INTEGER REFERENCES empresas(id),
       papel TEXT DEFAULT 'atendente',
       criado_em TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS contatos (
       id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
       nome TEXT NOT NULL,
       telefone TEXT,
       segmento TEXT,
@@ -143,6 +170,7 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS conversas (
       id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
       contato_id INTEGER REFERENCES contatos(id),
       status TEXT DEFAULT 'aberta',
       canal TEXT DEFAULT 'whatsapp',
@@ -152,6 +180,7 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS mensagens (
       id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
       conversa_id INTEGER REFERENCES conversas(id),
       tipo TEXT DEFAULT 'received',
       conteudo TEXT NOT NULL,
@@ -160,6 +189,7 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS respostas_rapidas (
       id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
       titulo TEXT NOT NULL,
       categoria TEXT,
       mensagem TEXT NOT NULL,
@@ -168,13 +198,15 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS empresa_config (
       id SERIAL PRIMARY KEY,
-      chave TEXT UNIQUE NOT NULL,
+      empresa_id INTEGER REFERENCES empresas(id),
+      chave TEXT NOT NULL,
       valor TEXT,
       atualizado_em TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS produtos (
       id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
       nome TEXT NOT NULL,
       descricao TEXT,
       preco NUMERIC(10,2),
@@ -185,6 +217,38 @@ async function initDB() {
     );
 
     ALTER TABLE produtos ADD COLUMN IF NOT EXISTS foto_url TEXT;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE contatos ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE conversas ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE respostas_rapidas ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE empresa_config ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+
+    UPDATE usuarios SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE contatos SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE conversas SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE mensagens SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE respostas_rapidas SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE empresa_config SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+    UPDATE produtos SET empresa_id=(SELECT id FROM empresas WHERE slug='taatendido-demo') WHERE empresa_id IS NULL;
+
+    ALTER TABLE usuarios ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE contatos ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE conversas ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE mensagens ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE respostas_rapidas ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE empresa_config ALTER COLUMN empresa_id SET NOT NULL;
+    ALTER TABLE produtos ALTER COLUMN empresa_id SET NOT NULL;
+
+    ALTER TABLE empresa_config DROP CONSTRAINT IF EXISTS empresa_config_chave_key;
+    CREATE UNIQUE INDEX IF NOT EXISTS empresa_config_empresa_chave_idx ON empresa_config (empresa_id, chave);
+    CREATE INDEX IF NOT EXISTS usuarios_empresa_idx ON usuarios (empresa_id);
+    CREATE INDEX IF NOT EXISTS contatos_empresa_idx ON contatos (empresa_id);
+    CREATE INDEX IF NOT EXISTS conversas_empresa_idx ON conversas (empresa_id);
+    CREATE INDEX IF NOT EXISTS mensagens_empresa_idx ON mensagens (empresa_id);
+    CREATE INDEX IF NOT EXISTS respostas_empresa_idx ON respostas_rapidas (empresa_id);
+    CREATE INDEX IF NOT EXISTS produtos_empresa_idx ON produtos (empresa_id);
   `);
   console.log('Banco de dados inicializado com sucesso.');
 }
@@ -204,6 +268,65 @@ function validarId(id) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+function empresaId(req) {
+  return req.usuario?.empresa_id;
+}
+
+function gerarSlug(texto) {
+  return String(texto || 'empresa')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60) || 'empresa';
+}
+
+async function criarEmpresa(nomeEmpresa) {
+  const nome = String(nomeEmpresa || 'Minha empresa').trim().slice(0, 200) || 'Minha empresa';
+  const base = gerarSlug(nome);
+
+  for (let i = 0; i < 5; i++) {
+    const slug = i === 0 ? base : `${base}-${crypto.randomBytes(3).toString('hex')}`;
+    try {
+      const { rows } = await pool.query(
+        'INSERT INTO empresas (nome, slug) VALUES ($1, $2) RETURNING id, nome, slug',
+        [nome, slug]
+      );
+      return rows[0];
+    } catch (err) {
+      if (err.code !== '23505') throw err;
+    }
+  }
+
+  const slug = `${base}-${Date.now()}`;
+  const { rows } = await pool.query(
+    'INSERT INTO empresas (nome, slug) VALUES ($1, $2) RETURNING id, nome, slug',
+    [nome, slug]
+  );
+  return rows[0];
+}
+
+function montarUsuarioToken(usuario) {
+  return {
+    id: usuario.id,
+    email: usuario.email,
+    papel: usuario.papel,
+    empresa_id: usuario.empresa_id,
+  };
+}
+
+function montarUsuarioPublico(usuario) {
+  return {
+    id: usuario.id,
+    nome: usuario.nome,
+    email: usuario.email,
+    papel: usuario.papel,
+    empresa_id: usuario.empresa_id,
+    empresa_nome: usuario.empresa_nome,
+  };
+}
+
 // Hash dummy pré-gerado para evitar timing attack no login
 // (mesmo custo que o hash real, sem revelar se o email existe)
 const DUMMY_HASH = '$2b$12$KIXBc5P2nkxJ7nCc5S8Np.kULaXexPBiT5F5L5R3JwK6NxH1zGxSe';
@@ -211,7 +334,7 @@ const DUMMY_HASH = '$2b$12$KIXBc5P2nkxJ7nCc5S8Np.kULaXexPBiT5F5L5R3JwK6NxH1zGxSe
 // ── Auth: Registro ────────────────────────────────────────
 app.post('/api/auth/registro', async (req, res) => {
   try {
-    const { nome, email, senha } = req.body;
+    const { nome, email, senha, empresa_nome } = req.body;
 
     if (!nome || !email || !senha)
       return res.status(400).json({ erro: 'Preencha todos os campos.' });
@@ -228,18 +351,22 @@ app.post('/api/auth/registro', async (req, res) => {
     const existe = await pool.query('SELECT id FROM usuarios WHERE email=$1', [email.toLowerCase()]);
     if (existe.rows.length) return res.status(409).json({ erro: 'Email já cadastrado.' });
 
+    const empresa = await criarEmpresa(empresa_nome || nome);
     const senha_hash = await bcrypt.hash(senha, 12);
     const { rows } = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha_hash) VALUES ($1, $2, $3) RETURNING id, nome, email, papel',
-      [nome.trim(), email.toLowerCase(), senha_hash]
+      `INSERT INTO usuarios (nome, email, senha_hash, empresa_id, papel)
+       VALUES ($1, $2, $3, $4, 'admin')
+       RETURNING id, nome, email, papel, empresa_id`,
+      [nome.trim(), email.toLowerCase(), senha_hash, empresa.id]
     );
 
+    rows[0].empresa_nome = empresa.nome;
     const token = jwt.sign(
-      { id: rows[0].id, email: rows[0].email, papel: rows[0].papel },
+      montarUsuarioToken(rows[0]),
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.status(201).json({ token, usuario: rows[0] });
+    res.status(201).json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
   }
@@ -256,7 +383,12 @@ app.post('/api/auth/login', async (req, res) => {
     if (!validarEmail(email))
       return res.status(400).json({ erro: 'Email inválido.' });
 
-    const { rows } = await pool.query('SELECT * FROM usuarios WHERE email=$1', [email.toLowerCase()]);
+    const { rows } = await pool.query(`
+      SELECT u.*, e.nome AS empresa_nome
+      FROM usuarios u
+      JOIN empresas e ON e.id = u.empresa_id
+      WHERE u.email=$1
+    `, [email.toLowerCase()]);
 
     // Mesmo tempo de resposta se o usuário não existir (evita user enumeration)
     const hash = rows.length ? rows[0].senha_hash : DUMMY_HASH;
@@ -266,11 +398,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ erro: 'Email ou senha incorretos.' });
 
     const token = jwt.sign(
-      { id: rows[0].id, email: rows[0].email, papel: rows[0].papel },
+      montarUsuarioToken(rows[0]),
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.json({ token, usuario: { id: rows[0].id, nome: rows[0].nome, email: rows[0].email, papel: rows[0].papel } });
+    res.json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
   }
@@ -279,9 +411,14 @@ app.post('/api/auth/login', async (req, res) => {
 // ── Auth: Verificar token ─────────────────────────────────
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, nome, email, papel FROM usuarios WHERE id=$1', [req.usuario.id]);
+    const { rows } = await pool.query(`
+      SELECT u.id, u.nome, u.email, u.papel, u.empresa_id, e.nome AS empresa_nome
+      FROM usuarios u
+      JOIN empresas e ON e.id = u.empresa_id
+      WHERE u.id=$1 AND u.empresa_id=$2
+    `, [req.usuario.id, empresaId(req)]);
     if (!rows.length) return res.status(404).json({ erro: 'Usuário não encontrado.' });
-    res.json(rows[0]);
+    res.json(montarUsuarioPublico(rows[0]));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -291,7 +428,10 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 app.get('/api/contatos', authMiddleware, async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 200, 500);
-    const { rows } = await pool.query('SELECT * FROM contatos ORDER BY criado_em DESC LIMIT $1', [limite]);
+    const { rows } = await pool.query(
+      'SELECT * FROM contatos WHERE empresa_id=$1 ORDER BY criado_em DESC LIMIT $2',
+      [empresaId(req), limite]
+    );
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -303,8 +443,8 @@ app.post('/api/contatos', authMiddleware, async (req, res) => {
     const { nome, telefone, segmento } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
     const { rows } = await pool.query(
-      'INSERT INTO contatos (nome, telefone, segmento) VALUES ($1, $2, $3) RETURNING *',
-      [nome.trim(), telefone?.trim(), segmento?.trim()]
+      'INSERT INTO contatos (empresa_id, nome, telefone, segmento) VALUES ($1, $2, $3, $4) RETURNING *',
+      [empresaId(req), nome.trim(), telefone?.trim(), segmento?.trim()]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -319,10 +459,11 @@ app.get('/api/conversas', authMiddleware, async (req, res) => {
     const { rows } = await pool.query(`
       SELECT c.*, ct.nome as contato_nome, ct.telefone as contato_telefone
       FROM conversas c
-      LEFT JOIN contatos ct ON c.contato_id = ct.id
+      LEFT JOIN contatos ct ON c.contato_id = ct.id AND ct.empresa_id = c.empresa_id
+      WHERE c.empresa_id=$1
       ORDER BY c.atualizado_em DESC
-      LIMIT $1
-    `, [limite]);
+      LIMIT $2
+    `, [empresaId(req), limite]);
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -333,9 +474,15 @@ app.post('/api/conversas', authMiddleware, async (req, res) => {
   try {
     const { contato_id, canal } = req.body;
     if (!contato_id) return res.status(400).json({ erro: 'contato_id é obrigatório.' });
+    const contato = await pool.query(
+      'SELECT id FROM contatos WHERE id=$1 AND empresa_id=$2',
+      [contato_id, empresaId(req)]
+    );
+    if (!contato.rows.length) return res.status(404).json({ erro: 'Contato nao encontrado.' });
+
     const { rows } = await pool.query(
-      'INSERT INTO conversas (contato_id, canal) VALUES ($1, $2) RETURNING *',
-      [contato_id, canal || 'whatsapp']
+      'INSERT INTO conversas (empresa_id, contato_id, canal) VALUES ($1, $2, $3) RETURNING *',
+      [empresaId(req), contato_id, canal || 'whatsapp']
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -354,8 +501,8 @@ app.patch('/api/conversas/:id/status', authMiddleware, async (req, res) => {
       return res.status(400).json({ erro: 'Status inválido.' });
 
     const { rows } = await pool.query(
-      'UPDATE conversas SET status=$1, atualizado_em=NOW() WHERE id=$2 RETURNING *',
-      [status, id]
+      'UPDATE conversas SET status=$1, atualizado_em=NOW() WHERE id=$2 AND empresa_id=$3 RETURNING *',
+      [status, id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Conversa não encontrada.' });
     res.json(rows[0]);
@@ -372,8 +519,8 @@ app.get('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
 
     const limite = Math.min(parseInt(req.query.limite) || 200, 500);
     const { rows } = await pool.query(
-      'SELECT * FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC LIMIT $2',
-      [id, limite]
+      'SELECT * FROM mensagens WHERE conversa_id=$1 AND empresa_id=$2 ORDER BY criado_em ASC LIMIT $3',
+      [id, empresaId(req), limite]
     );
     res.json(rows);
   } catch (err) {
@@ -393,11 +540,17 @@ app.post('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
     const tiposValidos = ['received', 'sent'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'received';
 
-    const { rows } = await pool.query(
-      'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1, $2, $3) RETURNING *',
-      [id, tipoFinal, conteudo.trim()]
+    const conversa = await pool.query(
+      'SELECT id FROM conversas WHERE id=$1 AND empresa_id=$2',
+      [id, empresaId(req)]
     );
-    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [id]);
+    if (!conversa.rows.length) return res.status(404).json({ erro: 'Conversa nao encontrada.' });
+
+    const { rows } = await pool.query(
+      'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1, $2, $3, $4) RETURNING *',
+      [empresaId(req), id, tipoFinal, conteudo.trim()]
+    );
+    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
     res.status(201).json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
@@ -407,7 +560,10 @@ app.post('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
 // ── Respostas rápidas ─────────────────────────────────────
 app.get('/api/respostas', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM respostas_rapidas ORDER BY criado_em DESC');
+    const { rows } = await pool.query(
+      'SELECT * FROM respostas_rapidas WHERE empresa_id=$1 ORDER BY criado_em DESC',
+      [empresaId(req)]
+    );
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -419,8 +575,8 @@ app.post('/api/respostas', authMiddleware, async (req, res) => {
     const { titulo, categoria, mensagem } = req.body;
     if (!titulo || !mensagem) return res.status(400).json({ erro: 'Título e mensagem são obrigatórios.' });
     const { rows } = await pool.query(
-      'INSERT INTO respostas_rapidas (titulo, categoria, mensagem) VALUES ($1, $2, $3) RETURNING *',
-      [titulo.trim(), categoria?.trim(), mensagem.trim()]
+      'INSERT INTO respostas_rapidas (empresa_id, titulo, categoria, mensagem) VALUES ($1, $2, $3, $4) RETURNING *',
+      [empresaId(req), titulo.trim(), categoria?.trim(), mensagem.trim()]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -433,7 +589,7 @@ app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
 
-    const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1', [id]);
+    const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Resposta não encontrada.' });
     res.json({ mensagem: 'Resposta removida.' });
   } catch (err) {
@@ -444,7 +600,10 @@ app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
 // ── Empresa: configuração ─────────────────────────────────
 app.get('/api/empresa/config', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const { rows } = await pool.query(
+      'SELECT chave, valor FROM empresa_config WHERE empresa_id=$1',
+      [empresaId(req)]
+    );
     const config = {};
     rows.forEach(r => { config[r.chave] = r.valor; });
     res.json(config);
@@ -461,16 +620,23 @@ app.post('/api/empresa/config', authMiddleware, async (req, res) => {
       'horario_seg_sex','horario_sabado','horario_domingo',
       'auto_saudacao','auto_fora_horario','auto_escalar',
       'formas_pagamento','taxa_entrega','tempo_entrega',
+      'whatsapp_phone_id',
     ];
     const entries = Object.entries(req.body).filter(([k]) => permitidas.includes(k));
     if (!entries.length) return res.status(400).json({ erro: 'Nenhum campo válido enviado.' });
 
     for (const [chave, valor] of entries) {
       await pool.query(`
-        INSERT INTO empresa_config (chave, valor, atualizado_em)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (chave) DO UPDATE SET valor=$2, atualizado_em=NOW()
-      `, [chave, String(valor).slice(0, 1000)]);
+        INSERT INTO empresa_config (empresa_id, chave, valor, atualizado_em)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (empresa_id, chave) DO UPDATE SET valor=$3, atualizado_em=NOW()
+      `, [empresaId(req), chave, String(valor).slice(0, 1000)]);
+    }
+    if (req.body.nome_empresa) {
+      await pool.query(
+        'UPDATE empresas SET nome=$1 WHERE id=$2',
+        [String(req.body.nome_empresa).trim().slice(0, 200), empresaId(req)]
+      );
     }
     res.json({ mensagem: 'Configurações salvas.' });
   } catch (err) {
@@ -514,7 +680,10 @@ app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, 
 // ── Produtos ──────────────────────────────────────────────
 app.get('/api/produtos', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM produtos ORDER BY categoria, nome');
+    const { rows } = await pool.query(
+      'SELECT * FROM produtos WHERE empresa_id=$1 ORDER BY categoria, nome',
+      [empresaId(req)]
+    );
     res.json(rows);
   } catch (err) {
     erroInterno(res, err);
@@ -529,8 +698,8 @@ app.post('/api/produtos', authMiddleware, async (req, res) => {
     if (preco && isNaN(precoNum)) return res.status(400).json({ erro: 'Preço inválido.' });
     const fotoFinal = foto_url?.startsWith('/uploads/') ? foto_url : null;
     const { rows } = await pool.query(
-      'INSERT INTO produtos (nome, descricao, preco, categoria, foto_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), fotoFinal]
+      'INSERT INTO produtos (empresa_id, nome, descricao, preco, categoria, foto_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [empresaId(req), nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), fotoFinal]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -547,8 +716,8 @@ app.patch('/api/produtos/:id', authMiddleware, async (req, res) => {
     const precoNum = preco ? parseFloat(preco) : null;
     if (preco && isNaN(precoNum)) return res.status(400).json({ erro: 'Preço inválido.' });
     const { rows } = await pool.query(
-      'UPDATE produtos SET nome=$1, descricao=$2, preco=$3, categoria=$4 WHERE id=$5 RETURNING *',
-      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), id]
+      'UPDATE produtos SET nome=$1, descricao=$2, preco=$3, categoria=$4 WHERE id=$5 AND empresa_id=$6 RETURNING *',
+      [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
     res.json(rows[0]);
@@ -564,8 +733,8 @@ app.patch('/api/produtos/:id/foto', authMiddleware, async (req, res) => {
     const { foto_url } = req.body;
     const fotoFinal = foto_url?.startsWith('/uploads/') ? foto_url : null;
     const { rows } = await pool.query(
-      'UPDATE produtos SET foto_url=$1 WHERE id=$2 RETURNING *',
-      [fotoFinal, id]
+      'UPDATE produtos SET foto_url=$1 WHERE id=$2 AND empresa_id=$3 RETURNING *',
+      [fotoFinal, id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
     res.json(rows[0]);
@@ -580,8 +749,8 @@ app.patch('/api/produtos/:id/disponivel', authMiddleware, async (req, res) => {
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
     const { disponivel } = req.body;
     const { rows } = await pool.query(
-      'UPDATE produtos SET disponivel=$1 WHERE id=$2 RETURNING *',
-      [!!disponivel, id]
+      'UPDATE produtos SET disponivel=$1 WHERE id=$2 AND empresa_id=$3 RETURNING *',
+      [!!disponivel, id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
     res.json(rows[0]);
@@ -594,7 +763,7 @@ app.delete('/api/produtos/:id', authMiddleware, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
-    const result = await pool.query('DELETE FROM produtos WHERE id=$1', [id]);
+    const result = await pool.query('DELETE FROM produtos WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Produto não encontrado.' });
     res.json({ mensagem: 'Produto removido.' });
   } catch (err) {
@@ -615,19 +784,29 @@ app.post('/api/agente/responder', authMiddleware, async (req, res) => {
     if (!id) return res.status(400).json({ erro: 'conversa_id inválido.' });
 
     // Buscar histórico da conversa (últimas 20 mensagens)
+    const conversa = await pool.query(
+      'SELECT id FROM conversas WHERE id=$1 AND empresa_id=$2',
+      [id, empresaId(req)]
+    );
+    if (!conversa.rows.length) return res.status(404).json({ erro: 'Conversa nao encontrada.' });
+
     const { rows: historico } = await pool.query(
-      'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em DESC LIMIT 20',
-      [id]
+      'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 AND empresa_id=$2 ORDER BY criado_em DESC LIMIT 20',
+      [id, empresaId(req)]
     );
 
     // Buscar config da empresa
-    const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const { rows: configRows } = await pool.query(
+      'SELECT chave, valor FROM empresa_config WHERE empresa_id=$1',
+      [empresaId(req)]
+    );
     const config = {};
     configRows.forEach(r => { config[r.chave] = r.valor; });
 
     // Buscar produtos disponíveis
     const { rows: produtos } = await pool.query(
-      'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+      'SELECT nome, descricao, preco, categoria FROM produtos WHERE empresa_id=$1 AND disponivel=TRUE ORDER BY categoria, nome',
+      [empresaId(req)]
     );
 
     const resposta = await agente.responder({
@@ -649,12 +828,16 @@ app.post('/api/agente/testar', authMiddleware, async (req, res) => {
     const { mensagem } = req.body;
     if (!mensagem?.trim()) return res.status(400).json({ erro: 'Mensagem é obrigatória.' });
 
-    const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+    const { rows: configRows } = await pool.query(
+      'SELECT chave, valor FROM empresa_config WHERE empresa_id=$1',
+      [empresaId(req)]
+    );
     const config = {};
     configRows.forEach(r => { config[r.chave] = r.valor; });
 
     const { rows: produtos } = await pool.query(
-      'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+      'SELECT nome, descricao, preco, categoria FROM produtos WHERE empresa_id=$1 AND disponivel=TRUE ORDER BY categoria, nome',
+      [empresaId(req)]
     );
 
     const resposta = await agente.responder({
@@ -702,11 +885,12 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
     const msg      = value.messages[0];
     const telefone = msg.from;                                   // ex: 5511999998888
     const nome     = value.contacts?.[0]?.profile?.name || 'Cliente';
+    const phoneNumberId = value.metadata?.phone_number_id;
 
     // Por enquanto processa apenas mensagens de texto
     if (msg.type !== 'text') {
       await enviarWhatsApp(telefone, 'Desculpe, ainda não consigo processar ' +
-        (msg.type === 'image' ? 'imagens' : 'esse tipo de mensagem') + '. Como posso ajudar?');
+        (msg.type === 'image' ? 'imagens' : 'esse tipo de mensagem') + '. Como posso ajudar?', phoneNumberId);
       return;
     }
 
@@ -714,7 +898,7 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
     if (!texto) return;
 
     console.log(`[whatsapp] ${nome} (${telefone}): ${texto.substring(0, 60)}`);
-    await processarMensagemWA({ telefone, nome, texto });
+    await processarMensagemWA({ telefone, nome, texto, phoneNumberId });
 
   } catch (err) {
     console.error('[whatsapp/webhook]', err.message);
@@ -722,15 +906,40 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
 });
 
 // ── Lógica central: DB + IA (usada por Meta e Twilio) ────
-async function processarMensagem({ telefone, nome, texto, canal }) {
+async function empresaPadraoId() {
+  const { rows } = await pool.query("SELECT id FROM empresas WHERE slug='taatendido-demo' LIMIT 1");
+  return rows[0]?.id;
+}
+
+async function resolverEmpresaWebhook({ phoneNumberId } = {}) {
+  if (process.env.TENANT_EMPRESA_ID) {
+    const id = validarId(process.env.TENANT_EMPRESA_ID);
+    if (id) return id;
+  }
+
+  if (phoneNumberId) {
+    const { rows } = await pool.query(`
+      SELECT empresa_id
+      FROM empresa_config
+      WHERE chave='whatsapp_phone_id' AND valor=$1
+      LIMIT 1
+    `, [String(phoneNumberId)]);
+    if (rows.length) return rows[0].empresa_id;
+  }
+
+  return empresaPadraoId();
+}
+
+async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
+  if (!empresa_id) throw new Error('Empresa nao identificada para o atendimento.');
   // 1. Buscar ou criar contato
   let { rows: [contato] } = await pool.query(
-    'SELECT id FROM contatos WHERE telefone=$1 LIMIT 1', [telefone]
+    'SELECT id FROM contatos WHERE empresa_id=$1 AND telefone=$2 LIMIT 1', [empresa_id, telefone]
   );
   if (!contato) {
     const ins = await pool.query(
-      'INSERT INTO contatos (nome, telefone) VALUES ($1,$2) RETURNING id',
-      [nome, telefone]
+      'INSERT INTO contatos (empresa_id, nome, telefone) VALUES ($1,$2,$3) RETURNING id',
+      [empresa_id, nome, telefone]
     );
     contato = ins.rows[0];
   }
@@ -738,37 +947,41 @@ async function processarMensagem({ telefone, nome, texto, canal }) {
   // 2. Buscar ou criar conversa aberta no canal
   let { rows: [conversa] } = await pool.query(
     `SELECT id FROM conversas
-     WHERE contato_id=$1 AND status='aberta' AND canal=$2
+     WHERE empresa_id=$1 AND contato_id=$2 AND status='aberta' AND canal=$3
      ORDER BY criado_em DESC LIMIT 1`,
-    [contato.id, canal]
+    [empresa_id, contato.id, canal]
   );
   if (!conversa) {
     const ins = await pool.query(
-      `INSERT INTO conversas (contato_id, status, canal) VALUES ($1,'aberta',$2) RETURNING id`,
-      [contato.id, canal]
+      `INSERT INTO conversas (empresa_id, contato_id, status, canal) VALUES ($1,$2,'aberta',$3) RETURNING id`,
+      [empresa_id, contato.id, canal]
     );
     conversa = ins.rows[0];
   }
 
   // 3. Salvar mensagem recebida
   await pool.query(
-    'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1,$2,$3)',
-    [conversa.id, 'received', texto]
+    'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1,$2,$3,$4)',
+    [empresa_id, conversa.id, 'received', texto]
   );
 
   // 4. Buscar histórico
   const { rows: historico } = await pool.query(
-    'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC',
-    [conversa.id]
+    'SELECT tipo, conteudo FROM mensagens WHERE empresa_id=$1 AND conversa_id=$2 ORDER BY criado_em ASC',
+    [empresa_id, conversa.id]
   );
 
   // 5. Buscar config e produtos
-  const { rows: configRows } = await pool.query('SELECT chave, valor FROM empresa_config');
+  const { rows: configRows } = await pool.query(
+    'SELECT chave, valor FROM empresa_config WHERE empresa_id=$1',
+    [empresa_id]
+  );
   const config = {};
   configRows.forEach(r => { config[r.chave] = r.valor; });
 
   const { rows: produtos } = await pool.query(
-    'SELECT nome, descricao, preco, categoria FROM produtos WHERE disponivel=TRUE ORDER BY categoria, nome'
+    'SELECT nome, descricao, preco, categoria FROM produtos WHERE empresa_id=$1 AND disponivel=TRUE ORDER BY categoria, nome',
+    [empresa_id]
   );
 
   // 6. Chamar IA
@@ -776,40 +989,40 @@ async function processarMensagem({ telefone, nome, texto, canal }) {
 
   // 7. Salvar resposta
   await pool.query(
-    'INSERT INTO mensagens (conversa_id, tipo, conteudo) VALUES ($1,$2,$3)',
-    [conversa.id, 'sent', resposta.texto]
+    'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1,$2,$3,$4)',
+    [empresa_id, conversa.id, 'sent', resposta.texto]
   );
 
   // 8. Atualizar status da conversa
   if (resposta.escalar) {
     await pool.query(
-      `UPDATE conversas SET status='escalada', atualizado_em=NOW() WHERE id=$1`, [conversa.id]
+      `UPDATE conversas SET status='escalada', atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2`, [conversa.id, empresa_id]
     );
   } else {
-    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [conversa.id]);
+    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2', [conversa.id, empresa_id]);
   }
 
   return resposta;
 }
 
-async function processarMensagemWA({ telefone, nome, texto }) {
-  const resposta = await processarMensagem({ telefone, nome, texto, canal: 'whatsapp' });
+async function processarMensagemWA({ telefone, nome, texto, phoneNumberId }) {
+  const empresa_id = await resolverEmpresaWebhook({ phoneNumberId });
+  const resposta = await processarMensagem({ empresa_id, telefone, nome, texto, canal: 'whatsapp' });
 
   // 8. Enviar resposta ao cliente
-  await enviarWhatsApp(telefone, resposta.texto);
+  await enviarWhatsApp(telefone, resposta.texto, phoneNumberId);
 
   if (resposta.escalar) console.log('[whatsapp] Conversa escalada para humano.');
-  await enviarWhatsApp(telefone, resposta.texto);
 }
 
-async function enviarWhatsApp(telefone, texto) {
-  if (!WA_TOKEN || !WA_PHONE_ID) {
+async function enviarWhatsApp(telefone, texto, phoneNumberId = WA_PHONE_ID) {
+  if (!WA_TOKEN || !phoneNumberId) {
     console.warn('[whatsapp] WHATSAPP_TOKEN ou WHATSAPP_PHONE_ID não configurados.');
     return;
   }
   try {
     const res = await fetch(
-      `https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`,
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
       {
         method: 'POST',
         headers: {
@@ -850,7 +1063,8 @@ app.post('/api/twilio/webhook', express.urlencoded({ extended: false }), async (
 
     console.log(`[twilio] ${nome} (${from}): ${texto.substring(0, 60)}`);
 
-    const resposta = await processarMensagem({ telefone: from, nome, texto, canal: 'twilio' });
+    const empresa_id = await resolverEmpresaWebhook();
+    const resposta = await processarMensagem({ empresa_id, telefone: from, nome, texto, canal: 'twilio' });
 
     // Escapa caracteres XML na resposta da IA
     const textoXml = resposta.texto

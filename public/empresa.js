@@ -5,6 +5,7 @@ const campos = [
   'msg_saudacao','msg_fora_horario','msg_sem_resposta',
   'horario_seg_sex','horario_sabado','horario_domingo',
   'formas_pagamento','taxa_entrega','tempo_entrega',
+  'whatsapp_phone_id',
 ];
 const checkboxes = ['auto_saudacao','auto_fora_horario','auto_escalar'];
 
