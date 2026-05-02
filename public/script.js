@@ -29,6 +29,15 @@ function iniciais(nome) {
   return (nome || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 }
 
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /* ── Lista de conversas ─────────────────────────────────── */
 async function carregarConversas() {
   try {
@@ -51,13 +60,13 @@ async function carregarConversas() {
       card.dataset.status = c.status;
       card.dataset.contact = c.contato_nome || 'Desconhecido';
       card.innerHTML = `
-        <span class="avatar">${iniciais(c.contato_nome)}</span>
+        <span class="avatar">${esc(iniciais(c.contato_nome))}</span>
         <span class="conversation-main">
-          <strong>${c.contato_nome || 'Desconhecido'}</strong>
-          <small>${c.contato_telefone || c.canal || 'WhatsApp'}</small>
+          <strong>${esc(c.contato_nome || 'Desconhecido')}</strong>
+          <small>${esc(c.contato_telefone || c.canal || 'WhatsApp')}</small>
         </span>
         <span class="conversation-meta">
-          <time>${formatarDataCurta(c.atualizado_em)}</time>
+          <time>${esc(formatarDataCurta(c.atualizado_em))}</time>
         </span>
       `;
 
@@ -159,7 +168,12 @@ composer?.addEventListener('submit', async (e) => {
   // Exibir imediatamente (feedback otimista)
   const div = document.createElement('div');
   div.className = 'message sent';
-  div.innerHTML = `<p>${texto}</p><time>Agora</time>`;
+  const p = document.createElement('p');
+  p.textContent = texto;
+  div.appendChild(p);
+  const time = document.createElement('time');
+  time.textContent = 'Agora';
+  div.appendChild(time);
   messageArea.appendChild(div);
   messageArea.scrollTop = messageArea.scrollHeight;
   messageInput.value = '';

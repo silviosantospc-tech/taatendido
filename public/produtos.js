@@ -134,9 +134,11 @@ document.getElementById('listaProdutos').addEventListener('change', async functi
   form.append('foto', file);
   try {
     const token = localStorage.getItem('ta_token');
+    const headers = token ? { Authorization: 'Bearer ' + token } : {};
     const up = await fetch('/api/upload/foto', {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
+      credentials: 'same-origin',
+      headers,
       body: form,
     });
     if (!up.ok) { toast('Erro ao enviar foto.', 'error'); return; }
@@ -275,8 +277,9 @@ document.getElementById('formProduto').addEventListener('submit', async e => {
       const form = new FormData();
       form.append('foto', fotoFile);
       const token = localStorage.getItem('ta_token');
+      const headers = token ? { Authorization: 'Bearer ' + token } : {};
       const up = await fetch('/api/upload/foto', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form,
+        method: 'POST', credentials: 'same-origin', headers, body: form,
       });
       if (up.ok) foto_url = (await up.json()).url;
     }

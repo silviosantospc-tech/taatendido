@@ -20,6 +20,9 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+const REGISTRATION_CODE = process.env.REGISTRATION_CODE;
+const PUBLIC_REGISTRATION_ENABLED = process.env.PUBLIC_REGISTRATION_ENABLED === 'true';
+
 // ── CORS: apenas domínios autorizados ────────────────────
 const origensPermitidas = [
   'https://taatendido.com.br',
@@ -55,9 +58,14 @@ app.use(cors({
   },
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
-app.use(express.json({ limit: '20kb' }));
+function capturarRawBody(req, res, buf) {
+  if (buf?.length) req.rawBody = Buffer.from(buf);
+}
+
+app.use(express.json({ limit: '20kb', verify: capturarRawBody }));
 
 // ── Redirecionar HTTP → HTTPS em produção ────────────────
 app.use((req, res, next) => {
@@ -100,12 +108,42 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Conexão com banco de dados ────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false,
+  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: true } : false,
 });
 
 // ── Middleware de autenticação ────────────────────────────
+function cookieValor(req, nome) {
+  const cookies = req.headers.cookie || '';
+  const item = cookies.split(';').map(c => c.trim()).find(c => c.startsWith(nome + '='));
+  return item ? decodeURIComponent(item.slice(nome.length + 1)) : null;
+}
+
+function opcoesCookieAuth(req) {
+  const seguro = process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https';
+  return {
+    httpOnly: true,
+    secure: seguro,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+}
+
+function criarToken(usuario) {
+  return jwt.sign(montarUsuarioToken(usuario), JWT_SECRET, { expiresIn: '7d' });
+}
+
+function emitirSessao(req, res, usuario) {
+  const token = criarToken(usuario);
+  res.cookie('ta_session', token, opcoesCookieAuth(req));
+  return token;
+}
+
+function limparSessao(req, res) {
+  res.clearCookie('ta_session', { ...opcoesCookieAuth(req), maxAge: undefined });
+}
+
 async function authMiddleware(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1] || cookieValor(req, 'ta_session');
   if (!token) return res.status(401).json({ erro: 'Token não fornecido.' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
@@ -272,6 +310,44 @@ function empresaId(req) {
   return req.usuario?.empresa_id;
 }
 
+function exigirAdmin(req, res, next) {
+  if (req.usuario?.papel !== 'admin') {
+    return res.status(403).json({ erro: 'Acesso restrito ao administrador.' });
+  }
+  next();
+}
+
+function compararSeguro(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+
+function validarAssinaturaMeta(req) {
+  const segredo = process.env.WHATSAPP_APP_SECRET;
+  if (!segredo) return false;
+  const assinatura = req.get('x-hub-signature-256') || '';
+  const esperado = 'sha256=' + crypto
+    .createHmac('sha256', segredo)
+    .update(req.rawBody || Buffer.from(JSON.stringify(req.body || {})))
+    .digest('hex');
+  return compararSeguro(assinatura, esperado);
+}
+
+function validarAssinaturaTwilio(req) {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const assinatura = req.get('x-twilio-signature') || '';
+  if (!authToken || !assinatura) return false;
+
+  const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  const params = Object.keys(req.body || {})
+    .sort()
+    .map(chave => chave + req.body[chave])
+    .join('');
+  const esperado = crypto.createHmac('sha1', authToken).update(url + params).digest('base64');
+  return compararSeguro(assinatura, esperado);
+}
+
 function gerarSlug(texto) {
   return String(texto || 'empresa')
     .normalize('NFD')
@@ -334,7 +410,15 @@ const DUMMY_HASH = '$2b$12$KIXBc5P2nkxJ7nCc5S8Np.kULaXexPBiT5F5L5R3JwK6NxH1zGxSe
 // ── Auth: Registro ────────────────────────────────────────
 app.post('/api/auth/registro', async (req, res) => {
   try {
-    const { nome, email, senha, empresa_nome } = req.body;
+    const { nome, email, senha, empresa_nome, codigo_convite } = req.body;
+
+    if (!PUBLIC_REGISTRATION_ENABLED && !REGISTRATION_CODE) {
+      return res.status(403).json({ erro: 'Cadastro publico fechado. Solicite um convite.' });
+    }
+
+    if (REGISTRATION_CODE && codigo_convite !== REGISTRATION_CODE) {
+      return res.status(403).json({ erro: 'Codigo de convite invalido.' });
+    }
 
     if (!nome || !email || !senha)
       return res.status(400).json({ erro: 'Preencha todos os campos.' });
@@ -361,11 +445,7 @@ app.post('/api/auth/registro', async (req, res) => {
     );
 
     rows[0].empresa_nome = empresa.nome;
-    const token = jwt.sign(
-      montarUsuarioToken(rows[0]),
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = emitirSessao(req, res, rows[0]);
     res.status(201).json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
@@ -397,11 +477,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!rows.length || !valido)
       return res.status(401).json({ erro: 'Email ou senha incorretos.' });
 
-    const token = jwt.sign(
-      montarUsuarioToken(rows[0]),
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = emitirSessao(req, res, rows[0]);
     res.json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
@@ -425,6 +501,11 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ── Contatos ──────────────────────────────────────────────
+app.post('/api/auth/logout', (req, res) => {
+  limparSessao(req, res);
+  res.json({ mensagem: 'Sessao encerrada.' });
+});
+
 app.get('/api/contatos', authMiddleware, async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 200, 500);
@@ -570,7 +651,7 @@ app.get('/api/respostas', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/respostas', authMiddleware, async (req, res) => {
+app.post('/api/respostas', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const { titulo, categoria, mensagem } = req.body;
     if (!titulo || !mensagem) return res.status(400).json({ erro: 'Título e mensagem são obrigatórios.' });
@@ -584,7 +665,7 @@ app.post('/api/respostas', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/respostas/:id', authMiddleware, async (req, res) => {
+app.delete('/api/respostas/:id', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -612,7 +693,7 @@ app.get('/api/empresa/config', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/empresa/config', authMiddleware, async (req, res) => {
+app.post('/api/empresa/config', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const permitidas = [
       'nome_empresa','segmento','whatsapp','email',
@@ -651,22 +732,33 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 // Multer usa memória — sharp processa e salva em disco
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // aceita até 10 MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.mimetype);
+    const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
     cb(ok ? null : new Error('Formato inválido. Use JPG, PNG ou WebP.'), ok);
   },
 });
 
-app.post('/api/upload/foto', authMiddleware, upload.single('foto'), async (req, res) => {
+function detectarImagem(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return { mime: 'image/jpeg', ext: '.jpg' };
+  if (buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: '.png' };
+  if (buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') return { mime: 'image/webp', ext: '.webp' };
+  return null;
+}
+
+app.post('/api/upload/foto', authMiddleware, exigirAdmin, upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
   try {
+    const imagem = detectarImagem(req.file.buffer);
+    if (!imagem || imagem.mime !== req.file.mimetype) {
+      return res.status(400).json({ erro: 'Arquivo de imagem invalido.' });
+    }
+
     // Garante que o diretório existe (pode ter sido apagado)
     await fs.promises.mkdir(UPLOADS_DIR, { recursive: true });
 
-    const ext  = req.file.mimetype === 'image/png'  ? '.png'
-               : req.file.mimetype === 'image/webp' ? '.webp' : '.jpg';
-    const nome    = crypto.randomBytes(12).toString('hex') + ext;
+    const nome    = crypto.randomBytes(12).toString('hex') + imagem.ext;
     const destino = path.join(UPLOADS_DIR, nome);
 
     await fs.promises.writeFile(destino, req.file.buffer);
@@ -690,7 +782,7 @@ app.get('/api/produtos', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/produtos', authMiddleware, async (req, res) => {
+app.post('/api/produtos', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const { nome, descricao, preco, categoria, foto_url } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
@@ -707,7 +799,7 @@ app.post('/api/produtos', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/produtos/:id', authMiddleware, async (req, res) => {
+app.patch('/api/produtos/:id', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -726,7 +818,7 @@ app.patch('/api/produtos/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/produtos/:id/foto', authMiddleware, async (req, res) => {
+app.patch('/api/produtos/:id/foto', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -743,7 +835,7 @@ app.patch('/api/produtos/:id/foto', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/produtos/:id/disponivel', authMiddleware, async (req, res) => {
+app.patch('/api/produtos/:id/disponivel', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -759,7 +851,7 @@ app.patch('/api/produtos/:id/disponivel', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/produtos/:id', authMiddleware, async (req, res) => {
+app.delete('/api/produtos/:id', authMiddleware, exigirAdmin, async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -876,6 +968,11 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
   res.sendStatus(200); // responde imediatamente para a Meta não reenviar
 
   try {
+    if (!validarAssinaturaMeta(req)) {
+      console.warn('[whatsapp/webhook] Assinatura invalida ou WHATSAPP_APP_SECRET ausente.');
+      return;
+    }
+
     const body = req.body;
     if (body.object !== 'whatsapp_business_account') return;
 
@@ -927,7 +1024,8 @@ async function resolverEmpresaWebhook({ phoneNumberId } = {}) {
     if (rows.length) return rows[0].empresa_id;
   }
 
-  return empresaPadraoId();
+  if (process.env.NODE_ENV !== 'production') return empresaPadraoId();
+  return null;
 }
 
 async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
@@ -1047,10 +1145,16 @@ async function enviarWhatsApp(telefone, texto, phoneNumberId = WA_PHONE_ID) {
 }
 
 // ── Twilio WhatsApp Sandbox ───────────────────────────────
-app.post('/api/twilio/webhook', express.urlencoded({ extended: false }), async (req, res) => {
+app.post('/api/twilio/webhook', express.urlencoded({ extended: false, verify: capturarRawBody }), async (req, res) => {
   const xmlVazio = '<Response></Response>';
 
   try {
+    if (!validarAssinaturaTwilio(req)) {
+      console.warn('[twilio] Assinatura invalida ou TWILIO_AUTH_TOKEN ausente.');
+      res.set('Content-Type', 'text/xml');
+      return res.send(xmlVazio);
+    }
+
     // Twilio envia From no formato "whatsapp:+5582991734542"
     const from  = (req.body.From  || '').replace('whatsapp:', '').replace('+', '');
     const texto = (req.body.Body  || '').trim();

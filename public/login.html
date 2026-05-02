@@ -112,7 +112,8 @@
           return;
         }
 
-        localStorage.setItem('ta_token', data.token);
+        localStorage.removeItem('ta_token');
+        localStorage.setItem('ta_auth', '1');
         localStorage.setItem('ta_usuario', JSON.stringify(data.usuario));
         window.location.href = 'painel.html';
       } catch (err) {

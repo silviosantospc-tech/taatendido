@@ -56,6 +56,10 @@
               </button>
             </div>
           </label>
+          <label>
+            <span>Código de convite</span>
+            <input type="text" id="inputConvite" placeholder="Informe o código recebido" autocomplete="off">
+          </label>
           <div id="erroMsg" style="display:none;color:#ef4444;font-size:0.88rem;font-weight:500;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;"></div>
           <button type="submit">Criar conta grátis →</button>
         </form>
@@ -116,6 +120,7 @@
       const email = document.getElementById('inputEmail').value.trim();
       const senha = document.getElementById('inputSenha').value;
       const confirmar = document.getElementById('inputConfirmar').value;
+      const codigo_convite = document.getElementById('inputConvite').value.trim();
 
       erroMsg.style.display = 'none';
 
@@ -138,7 +143,7 @@
         const res = await fetch('/api/auth/registro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, empresa_nome, email, senha })
+          body: JSON.stringify({ nome, empresa_nome, email, senha, codigo_convite })
         });
         const data = await res.json();
 
@@ -150,7 +155,8 @@
           return;
         }
 
-        localStorage.setItem('ta_token', data.token);
+        localStorage.removeItem('ta_token');
+        localStorage.setItem('ta_auth', '1');
         localStorage.setItem('ta_usuario', JSON.stringify(data.usuario));
         window.location.href = 'painel.html';
       } catch (err) {

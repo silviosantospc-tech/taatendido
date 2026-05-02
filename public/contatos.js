@@ -26,6 +26,15 @@ function formatarData(iso) {
   return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
 }
 
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderContato(contato, index) {
   const ini = iniciais(contato.nome);
   const cor = cores[index % cores.length];
@@ -33,18 +42,18 @@ function renderContato(contato, index) {
 
   const tr = document.createElement("tr");
   tr.dataset.status = contato.status || 'ativo';
-  tr.dataset.nome   = contato.nome;
+  tr.dataset.nome   = contato.nome || '';
   tr.innerHTML = `
     <td>
       <span class="mini-contact">
-        <b style="background:${cor}">${ini}</b>
-        ${contato.nome}
+        <b style="background:${cor}">${esc(ini)}</b>
+        ${esc(contato.nome)}
       </span>
     </td>
-    <td class="td-muted">${contato.telefone || '—'}</td>
+    <td class="td-muted">${esc(contato.telefone || '—')}</td>
     <td class="td-muted">WhatsApp</td>
-    <td><span class="tag ${classe}">${label}</span></td>
-    <td class="td-muted">${formatarData(contato.criado_em)}</td>
+    <td><span class="tag ${classe}">${esc(label)}</span></td>
+    <td class="td-muted">${esc(formatarData(contato.criado_em))}</td>
     <td><button class="more-btn" aria-label="Mais opções">&#8942;</button></td>
   `;
   return tr;

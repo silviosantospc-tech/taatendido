@@ -5,6 +5,10 @@ const Auth = {
     return localStorage.getItem('ta_token');
   },
 
+  autenticado() {
+    return !!(localStorage.getItem('ta_auth') || this.token());
+  },
+
   usuario() {
     try {
       return JSON.parse(localStorage.getItem('ta_usuario'));
@@ -15,7 +19,7 @@ const Auth = {
 
   // Redireciona para login se não estiver autenticado
   exigirLogin() {
-    if (!this.token()) {
+    if (!this.autenticado()) {
       window.location.href = 'login.html';
       return false;
     }
@@ -24,16 +28,16 @@ const Auth = {
 
   // Cabeçalho Authorization para fetch
   headers() {
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.token()}`
-    };
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.token()) headers.Authorization = `Bearer ${this.token()}`;
+    return headers;
   },
 
   // Fetch autenticado
   async fetch(url, options = {}) {
     const res = await fetch(url, {
       ...options,
+      credentials: 'same-origin',
       headers: { ...this.headers(), ...(options.headers || {}) }
     });
     if (res.status === 401) {
@@ -44,7 +48,9 @@ const Auth = {
   },
 
   logout() {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => {});
     localStorage.removeItem('ta_token');
+    localStorage.removeItem('ta_auth');
     localStorage.removeItem('ta_usuario');
     window.location.href = 'login.html';
   }
