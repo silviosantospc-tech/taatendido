@@ -721,7 +721,8 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
   }
 });
 
-async function processarMensagemWA({ telefone, nome, texto }) {
+// ── Lógica central: DB + IA (usada por Meta e Twilio) ────
+async function processarMensagem({ telefone, nome, texto, canal }) {
   // 1. Buscar ou criar contato
   let { rows: [contato] } = await pool.query(
     'SELECT id FROM contatos WHERE telefone=$1 LIMIT 1', [telefone]
@@ -734,17 +735,17 @@ async function processarMensagemWA({ telefone, nome, texto }) {
     contato = ins.rows[0];
   }
 
-  // 2. Buscar ou criar conversa aberta no canal WhatsApp
+  // 2. Buscar ou criar conversa aberta no canal
   let { rows: [conversa] } = await pool.query(
     `SELECT id FROM conversas
-     WHERE contato_id=$1 AND status='aberta' AND canal='whatsapp'
+     WHERE contato_id=$1 AND status='aberta' AND canal=$2
      ORDER BY criado_em DESC LIMIT 1`,
-    [contato.id]
+    [contato.id, canal]
   );
   if (!conversa) {
     const ins = await pool.query(
-      `INSERT INTO conversas (contato_id, status, canal) VALUES ($1,'aberta','whatsapp') RETURNING id`,
-      [contato.id]
+      `INSERT INTO conversas (contato_id, status, canal) VALUES ($1,'aberta',$2) RETURNING id`,
+      [contato.id, canal]
     );
     conversa = ins.rows[0];
   }
@@ -755,7 +756,7 @@ async function processarMensagemWA({ telefone, nome, texto }) {
     [conversa.id, 'received', texto]
   );
 
-  // 4. Buscar histórico recente
+  // 4. Buscar histórico
   const { rows: historico } = await pool.query(
     'SELECT tipo, conteudo FROM mensagens WHERE conversa_id=$1 ORDER BY criado_em ASC',
     [conversa.id]
@@ -779,21 +780,26 @@ async function processarMensagemWA({ telefone, nome, texto }) {
     [conversa.id, 'sent', resposta.texto]
   );
 
+  // 8. Atualizar status da conversa
+  if (resposta.escalar) {
+    await pool.query(
+      `UPDATE conversas SET status='escalada', atualizado_em=NOW() WHERE id=$1`, [conversa.id]
+    );
+  } else {
+    await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [conversa.id]);
+  }
+
+  return resposta;
+}
+
+async function processarMensagemWA({ telefone, nome, texto }) {
+  const resposta = await processarMensagem({ telefone, nome, texto, canal: 'whatsapp' });
+
   // 8. Enviar resposta ao cliente
   await enviarWhatsApp(telefone, resposta.texto);
 
-  // 9. Se a IA pediu escalação, marcar conversa para humano
-  if (resposta.escalar) {
-    await pool.query(
-      `UPDATE conversas SET status='escalada', atualizado_em=NOW() WHERE id=$1`,
-      [conversa.id]
-    );
-    console.log(`[whatsapp] Conversa ${conversa.id} escalada para humano.`);
-  } else {
-    await pool.query(
-      'UPDATE conversas SET atualizado_em=NOW() WHERE id=$1', [conversa.id]
-    );
-  }
+  if (resposta.escalar) console.log('[whatsapp] Conversa escalada para humano.');
+  await enviarWhatsApp(telefone, resposta.texto);
 }
 
 async function enviarWhatsApp(telefone, texto) {
@@ -826,6 +832,42 @@ async function enviarWhatsApp(telefone, texto) {
     console.error('[whatsapp] Falha na requisição:', err.message);
   }
 }
+
+// ── Twilio WhatsApp Sandbox ───────────────────────────────
+app.post('/api/twilio/webhook', express.urlencoded({ extended: false }), async (req, res) => {
+  const xmlVazio = '<Response></Response>';
+
+  try {
+    // Twilio envia From no formato "whatsapp:+5582991734542"
+    const from  = (req.body.From  || '').replace('whatsapp:', '').replace('+', '');
+    const texto = (req.body.Body  || '').trim();
+    const nome  = req.body.ProfileName || 'Cliente';
+
+    if (!from || !texto) {
+      res.set('Content-Type', 'text/xml');
+      return res.send(xmlVazio);
+    }
+
+    console.log(`[twilio] ${nome} (${from}): ${texto.substring(0, 60)}`);
+
+    const resposta = await processarMensagem({ telefone: from, nome, texto, canal: 'twilio' });
+
+    // Escapa caracteres XML na resposta da IA
+    const textoXml = resposta.texto
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    res.set('Content-Type', 'text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${textoXml}</Message></Response>`);
+
+  } catch (err) {
+    console.error('[twilio]', err.message);
+    res.set('Content-Type', 'text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>Desculpe, tive um problema. Tente novamente.</Message></Response>`);
+  }
+});
 
 // ── Rota não encontrada ───────────────────────────────────
 app.use((req, res) => {
