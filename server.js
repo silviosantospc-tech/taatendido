@@ -23,6 +23,10 @@ if (!JWT_SECRET) {
 
 const REGISTRATION_CODE = process.env.REGISTRATION_CODE;
 const PUBLIC_REGISTRATION_ENABLED = process.env.PUBLIC_REGISTRATION_ENABLED === 'true';
+const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean);
 
 // ── CORS: apenas domínios autorizados ────────────────────
 const origensPermitidas = [
@@ -148,18 +152,23 @@ async function authMiddleware(req, res, next) {
   if (!token) return res.status(401).json({ erro: 'Token não fornecido.' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.empresa_id) {
-      req.usuario = payload;
-      return next();
-    }
+    const params = payload.empresa_id ? [payload.id, payload.empresa_id] : [payload.id];
+    const whereEmpresa = payload.empresa_id ? 'AND u.empresa_id=$2' : '';
+    const { rows } = await pool.query(`
+      SELECT u.id, u.email, u.papel, u.empresa_id, e.status AS empresa_status
+      FROM usuarios u
+      JOIN empresas e ON e.id = u.empresa_id
+      WHERE u.id=$1 ${whereEmpresa}
+    `, params);
 
-    const { rows } = await pool.query(
-      'SELECT id, email, papel, empresa_id FROM usuarios WHERE id=$1',
-      [payload.id]
-    );
     if (!rows.length || !rows[0].empresa_id) {
       return res.status(401).json({ erro: 'Usuario sem empresa vinculada.' });
     }
+
+    if (rows[0].empresa_status !== 'ativo' && !emailEhSuperAdmin(rows[0].email)) {
+      return res.status(403).json({ erro: 'Empresa inativa. Fale com o suporte.' });
+    }
+
     req.usuario = rows[0];
     next();
   } catch {
@@ -318,6 +327,21 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
+function emailEhSuperAdmin(email) {
+  return SUPER_ADMIN_EMAILS.includes(String(email || '').toLowerCase());
+}
+
+function ehSuperAdmin(req) {
+  return emailEhSuperAdmin(req.usuario?.email);
+}
+
+function exigirSuperAdmin(req, res, next) {
+  if (!ehSuperAdmin(req)) {
+    return res.status(403).json({ erro: 'Acesso restrito ao administrador do sistema.' });
+  }
+  next();
+}
+
 function compararSeguro(a, b) {
   const ba = Buffer.from(String(a || ''));
   const bb = Buffer.from(String(b || ''));
@@ -401,6 +425,7 @@ function montarUsuarioPublico(usuario) {
     papel: usuario.papel,
     empresa_id: usuario.empresa_id,
     empresa_nome: usuario.empresa_nome,
+    super_admin: emailEhSuperAdmin(usuario.email),
   };
 }
 
@@ -505,6 +530,93 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   limparSessao(req, res);
   res.json({ mensagem: 'Sessao encerrada.' });
+});
+
+app.get('/api/admin/empresas', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        e.id,
+        e.nome,
+        e.slug,
+        e.status,
+        e.criado_em,
+        COUNT(DISTINCT u.id)::int AS usuarios,
+        COUNT(DISTINCT c.id)::int AS conversas,
+        COUNT(DISTINCT p.id)::int AS produtos,
+        MAX(c.atualizado_em) AS ultima_conversa
+      FROM empresas e
+      LEFT JOIN usuarios u ON u.empresa_id = e.id
+      LEFT JOIN conversas c ON c.empresa_id = e.id
+      LEFT JOIN produtos p ON p.empresa_id = e.id
+      GROUP BY e.id
+      ORDER BY e.criado_em DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.get('/api/admin/empresas/:id/usuarios', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID invalido.' });
+
+    const { rows } = await pool.query(
+      `SELECT id, nome, email, papel, criado_em
+       FROM usuarios
+       WHERE empresa_id=$1
+       ORDER BY criado_em DESC`,
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.patch('/api/admin/empresas/:id/status', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID invalido.' });
+
+    const status = req.body.status;
+    if (!['ativo', 'inativo'].includes(status)) {
+      return res.status(400).json({ erro: 'Status invalido.' });
+    }
+
+    const { rows } = await pool.query(
+      'UPDATE empresas SET status=$1 WHERE id=$2 RETURNING id, nome, slug, status, criado_em',
+      [status, id]
+    );
+    if (!rows.length) return res.status(404).json({ erro: 'Empresa nao encontrada.' });
+    res.json(rows[0]);
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.patch('/api/admin/usuarios/:id/senha', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const id = validarId(req.params.id);
+    if (!id) return res.status(400).json({ erro: 'ID invalido.' });
+
+    const { senha } = req.body;
+    if (!senha || senha.length < 8) {
+      return res.status(400).json({ erro: 'A senha temporaria deve ter pelo menos 8 caracteres.' });
+    }
+
+    const senha_hash = await bcrypt.hash(senha, 12);
+    const { rows } = await pool.query(
+      'UPDATE usuarios SET senha_hash=$1 WHERE id=$2 RETURNING id, nome, email, papel, empresa_id',
+      [senha_hash, id]
+    );
+    if (!rows.length) return res.status(404).json({ erro: 'Usuario nao encontrado.' });
+    res.json({ mensagem: 'Senha atualizada.', usuario: rows[0] });
+  } catch (err) {
+    erroInterno(res, err);
+  }
 });
 
 app.get('/api/contatos', authMiddleware, async (req, res) => {
