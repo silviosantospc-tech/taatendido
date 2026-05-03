@@ -42,7 +42,7 @@ app.use(helmet({
       scriptSrc:  ["'self'"],
       styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc:    ["'self'", "https://fonts.gstatic.com"],
-      imgSrc:     ["'self'", "data:", "blob:"],
+      imgSrc:     ["'self'", "data:", "blob:", "https://i.pravatar.cc"],
       connectSrc: ["'self'"],
     },
   },
