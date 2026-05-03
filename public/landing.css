@@ -620,3 +620,49 @@ h2 {
   border-top: 1px solid var(--line);
   margin-top: 4px;
 }
+
+/* ── Legal ───────────────────────────────────────── */
+.legal-page {
+  width: 100%;
+  min-height: calc(100vh - 190px);
+  padding: 120px 24px 52px;
+  background: #eef4ff;
+}
+
+.legal-card {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 36px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.legal-card h1 {
+  color: var(--ink);
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+  margin-bottom: 8px;
+}
+
+.legal-card h2 {
+  color: var(--ink);
+  font-size: 1.08rem;
+  margin: 28px 0 8px;
+}
+
+.legal-card p {
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.75;
+}
+
+.legal-card a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.legal-updated {
+  margin-bottom: 18px;
+}
