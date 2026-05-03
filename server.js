@@ -27,6 +27,12 @@ const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(Boolean);
+const retentionDaysRaw = parseInt(process.env.DEFAULT_RETENTION_DAYS || '365', 10);
+const DEFAULT_RETENTION_DAYS = Number.isFinite(retentionDaysRaw) ? Math.max(retentionDaysRaw, 30) : 365;
+const APP_ENCRYPTION_KEY = process.env.APP_ENCRYPTION_KEY || '';
+if (!APP_ENCRYPTION_KEY) {
+  console.warn('AVISO: APP_ENCRYPTION_KEY não definida. Dados novos não serão criptografados no banco.');
+}
 
 // ── CORS: apenas domínios autorizados ────────────────────
 const origensPermitidas = [
@@ -155,7 +161,7 @@ async function authMiddleware(req, res, next) {
     const params = payload.empresa_id ? [payload.id, payload.empresa_id] : [payload.id];
     const whereEmpresa = payload.empresa_id ? 'AND u.empresa_id=$2' : '';
     const { rows } = await pool.query(`
-      SELECT u.id, u.email, u.papel, u.empresa_id, e.status AS empresa_status
+      SELECT u.id, u.email, u.papel, u.empresa_id, u.precisa_trocar_senha, u.permissoes, e.status AS empresa_status
       FROM usuarios u
       JOIN empresas e ON e.id = u.empresa_id
       WHERE u.id=$1 ${whereEmpresa}
@@ -170,6 +176,13 @@ async function authMiddleware(req, res, next) {
     }
 
     req.usuario = rows[0];
+    const rotasLiberadas = ['/api/auth/me', '/api/auth/trocar-senha', '/api/auth/logout', '/api/auth/2fa/status', '/api/auth/2fa/setup', '/api/auth/2fa/ativar'];
+    if (req.usuario.precisa_trocar_senha && !rotasLiberadas.includes(req.path)) {
+      return res.status(403).json({
+        erro: 'Troca de senha obrigatoria.',
+        troca_senha_obrigatoria: true,
+      });
+    }
     next();
   } catch {
     res.status(401).json({ erro: 'Token inválido ou expirado.' });
@@ -264,9 +277,28 @@ async function initDB() {
       criado_em TIMESTAMP DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS auditoria (
+      id SERIAL PRIMARY KEY,
+      empresa_id INTEGER REFERENCES empresas(id),
+      usuario_id INTEGER REFERENCES usuarios(id),
+      acao TEXT NOT NULL,
+      alvo_tipo TEXT,
+      alvo_id TEXT,
+      ip TEXT,
+      user_agent TEXT,
+      detalhes JSONB DEFAULT '{}'::jsonb,
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+
     ALTER TABLE produtos ADD COLUMN IF NOT EXISTS foto_url TEXT;
     ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS precisa_trocar_senha BOOLEAN DEFAULT FALSE;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS senha_alterada_em TIMESTAMP;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissoes JSONB DEFAULT '{}'::jsonb;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa_ativo BOOLEAN DEFAULT FALSE;
     ALTER TABLE contatos ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+    ALTER TABLE contatos ADD COLUMN IF NOT EXISTS telefone_hash TEXT;
     ALTER TABLE conversas ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
     ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
     ALTER TABLE respostas_rapidas ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
@@ -293,12 +325,32 @@ async function initDB() {
     CREATE UNIQUE INDEX IF NOT EXISTS empresa_config_empresa_chave_idx ON empresa_config (empresa_id, chave);
     CREATE INDEX IF NOT EXISTS usuarios_empresa_idx ON usuarios (empresa_id);
     CREATE INDEX IF NOT EXISTS contatos_empresa_idx ON contatos (empresa_id);
+    CREATE INDEX IF NOT EXISTS contatos_empresa_telefone_hash_idx ON contatos (empresa_id, telefone_hash);
     CREATE INDEX IF NOT EXISTS conversas_empresa_idx ON conversas (empresa_id);
     CREATE INDEX IF NOT EXISTS mensagens_empresa_idx ON mensagens (empresa_id);
     CREATE INDEX IF NOT EXISTS respostas_empresa_idx ON respostas_rapidas (empresa_id);
     CREATE INDEX IF NOT EXISTS produtos_empresa_idx ON produtos (empresa_id);
+    CREATE INDEX IF NOT EXISTS auditoria_empresa_idx ON auditoria (empresa_id, criado_em DESC);
+    CREATE INDEX IF NOT EXISTS auditoria_acao_idx ON auditoria (acao, criado_em DESC);
   `);
   console.log('Banco de dados inicializado com sucesso.');
+}
+
+async function aplicarRetencaoDados() {
+  const dias = DEFAULT_RETENTION_DAYS;
+  try {
+    const resultMensagens = await pool.query(
+      "DELETE FROM mensagens WHERE criado_em < NOW() - ($1 || ' days')::interval",
+      [dias]
+    );
+    const resultAuditoria = await pool.query(
+      "DELETE FROM auditoria WHERE criado_em < NOW() - ($1 || ' days')::interval",
+      [Math.max(dias, 365)]
+    );
+    console.log(`[retencao] mensagens removidas=${resultMensagens.rowCount}; auditoria removida=${resultAuditoria.rowCount}; dias=${dias}`);
+  } catch (err) {
+    console.error('[retencao]', err.message);
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -327,6 +379,21 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
+function temPermissao(req, permissao) {
+  if (req.usuario?.papel === 'admin' || ehSuperAdmin(req)) return true;
+  const permissoes = req.usuario?.permissoes || {};
+  return permissoes[permissao] === true;
+}
+
+function exigirPermissao(permissao) {
+  return (req, res, next) => {
+    if (!temPermissao(req, permissao)) {
+      return res.status(403).json({ erro: 'Permissao insuficiente.' });
+    }
+    next();
+  };
+}
+
 function emailEhSuperAdmin(email) {
   return SUPER_ADMIN_EMAILS.includes(String(email || '').toLowerCase());
 }
@@ -340,6 +407,119 @@ function exigirSuperAdmin(req, res, next) {
     return res.status(403).json({ erro: 'Acesso restrito ao administrador do sistema.' });
   }
   next();
+}
+
+function ipRequisicao(req) {
+  return (req.headers['x-forwarded-for'] || req.ip || '').toString().split(',')[0].trim();
+}
+
+async function registrarAuditoria(req, acao, alvoTipo = null, alvoId = null, detalhes = {}) {
+  try {
+    await pool.query(
+      `INSERT INTO auditoria (empresa_id, usuario_id, acao, alvo_tipo, alvo_id, ip, user_agent, detalhes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        req.usuario?.empresa_id || detalhes.empresa_id || null,
+        req.usuario?.id || detalhes.usuario_id || null,
+        acao,
+        alvoTipo,
+        alvoId ? String(alvoId) : null,
+        ipRequisicao(req),
+        String(req.get('user-agent') || '').slice(0, 300),
+        JSON.stringify(detalhes || {}),
+      ]
+    );
+  } catch (err) {
+    console.error('[auditoria]', err.message);
+  }
+}
+
+function chaveCriptografia() {
+  if (!APP_ENCRYPTION_KEY) return null;
+  return crypto.createHash('sha256').update(APP_ENCRYPTION_KEY).digest();
+}
+
+function criptografarTexto(valor) {
+  if (!valor) return valor;
+  const chave = chaveCriptografia();
+  if (!chave) return valor;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', chave, iv);
+  const cifrado = Buffer.concat([cipher.update(String(valor), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc:v1:${iv.toString('base64')}:${tag.toString('base64')}:${cifrado.toString('base64')}`;
+}
+
+function hashDado(valor) {
+  if (!valor) return null;
+  return crypto.createHash('sha256').update(String(valor).trim().toLowerCase()).digest('hex');
+}
+
+function descriptografarTexto(valor) {
+  if (!valor || !String(valor).startsWith('enc:v1:')) return valor;
+  const chave = chaveCriptografia();
+  if (!chave) return '[dado criptografado]';
+  try {
+    const [, , ivB64, tagB64, dadosB64] = String(valor).split(':');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', chave, Buffer.from(ivB64, 'base64'));
+    decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(dadosB64, 'base64')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch {
+    return '[erro ao descriptografar]';
+  }
+}
+
+function descriptografarLinha(row, campos) {
+  const copia = { ...row };
+  campos.forEach(campo => { copia[campo] = descriptografarTexto(copia[campo]); });
+  return copia;
+}
+
+const BASE32_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function gerarBase32(bytes = 20) {
+  const buffer = crypto.randomBytes(bytes);
+  let bits = '';
+  for (const byte of buffer) bits += byte.toString(2).padStart(8, '0');
+  return bits.match(/.{1,5}/g).map(parte => BASE32_ALFABETO[parseInt(parte.padEnd(5, '0'), 2)]).join('');
+}
+
+function base32ParaBuffer(secret) {
+  const limpo = String(secret || '').replace(/=+$/g, '').replace(/\s+/g, '').toUpperCase();
+  let bits = '';
+  for (const char of limpo) {
+    const idx = BASE32_ALFABETO.indexOf(char);
+    if (idx < 0) continue;
+    bits += idx.toString(2).padStart(5, '0');
+  }
+  const bytes = bits.match(/.{8}/g) || [];
+  return Buffer.from(bytes.map(byte => parseInt(byte, 2)));
+}
+
+function gerarTotp(secret, janela = Math.floor(Date.now() / 30000)) {
+  const buffer = Buffer.alloc(8);
+  buffer.writeUInt32BE(0, 0);
+  buffer.writeUInt32BE(janela, 4);
+  const hmac = crypto.createHmac('sha1', base32ParaBuffer(secret)).update(buffer).digest();
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const binario = ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  return String(binario % 1000000).padStart(6, '0');
+}
+
+function validarTotp(secret, codigo) {
+  const informado = String(codigo || '').replace(/\D/g, '');
+  if (informado.length !== 6 || !secret) return false;
+  const janela = Math.floor(Date.now() / 30000);
+  for (let delta = -1; delta <= 1; delta++) {
+    if (compararSeguro(gerarTotp(secret, janela + delta), informado)) return true;
+  }
+  return false;
 }
 
 function compararSeguro(a, b) {
@@ -426,6 +606,9 @@ function montarUsuarioPublico(usuario) {
     empresa_id: usuario.empresa_id,
     empresa_nome: usuario.empresa_nome,
     super_admin: emailEhSuperAdmin(usuario.email),
+    precisa_trocar_senha: usuario.precisa_trocar_senha === true,
+    mfa_ativo: usuario.mfa_ativo === true,
+    permissoes: usuario.permissoes || {},
   };
 }
 
@@ -464,14 +647,15 @@ app.post('/api/auth/registro', async (req, res) => {
     const empresa = await criarEmpresa(empresa_nome || nome);
     const senha_hash = await bcrypt.hash(senha, 12);
     const { rows } = await pool.query(
-      `INSERT INTO usuarios (nome, email, senha_hash, empresa_id, papel)
-       VALUES ($1, $2, $3, $4, 'admin')
-       RETURNING id, nome, email, papel, empresa_id`,
+      `INSERT INTO usuarios (nome, email, senha_hash, empresa_id, papel, senha_alterada_em)
+       VALUES ($1, $2, $3, $4, 'admin', NOW())
+       RETURNING id, nome, email, papel, empresa_id, precisa_trocar_senha, permissoes, mfa_ativo`,
       [nome.trim(), email.toLowerCase(), senha_hash, empresa.id]
     );
 
     rows[0].empresa_nome = empresa.nome;
     const token = emitirSessao(req, res, rows[0]);
+    await registrarAuditoria({ ...req, usuario: rows[0] }, 'auth.registro', 'usuario', rows[0].id, { empresa_id: empresa.id });
     res.status(201).json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
@@ -481,7 +665,7 @@ app.post('/api/auth/registro', async (req, res) => {
 // ── Auth: Login ───────────────────────────────────────────
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const { email, senha, codigo_2fa } = req.body;
 
     if (!email || !senha)
       return res.status(400).json({ erro: 'Preencha email e senha.' });
@@ -490,7 +674,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ erro: 'Email inválido.' });
 
     const { rows } = await pool.query(`
-      SELECT u.*, e.nome AS empresa_nome
+      SELECT u.*, e.nome AS empresa_nome, e.status AS empresa_status
       FROM usuarios u
       JOIN empresas e ON e.id = u.empresa_id
       WHERE u.email=$1
@@ -500,10 +684,28 @@ app.post('/api/auth/login', async (req, res) => {
     const hash = rows.length ? rows[0].senha_hash : DUMMY_HASH;
     const valido = await bcrypt.compare(senha, hash);
 
-    if (!rows.length || !valido)
+    if (!rows.length || !valido) {
+      await registrarAuditoria(req, 'auth.login_falha', 'usuario', null, { email: String(email || '').toLowerCase() });
       return res.status(401).json({ erro: 'Email ou senha incorretos.' });
+    }
+
+    if (rows[0].empresa_status === 'inativo' && !emailEhSuperAdmin(rows[0].email)) {
+      await registrarAuditoria({ ...req, usuario: rows[0] }, 'auth.login_empresa_inativa', 'empresa', rows[0].empresa_id);
+      return res.status(403).json({ erro: 'Empresa inativa. Fale com o suporte.' });
+    }
+
+    if (emailEhSuperAdmin(rows[0].email) && rows[0].mfa_ativo) {
+      if (!codigo_2fa) {
+        return res.status(401).json({ requer_2fa: true, erro: 'Informe o codigo de verificacao.' });
+      }
+      if (!validarTotp(descriptografarTexto(rows[0].mfa_secret), codigo_2fa)) {
+        await registrarAuditoria({ ...req, usuario: rows[0] }, 'auth.2fa_falha', 'usuario', rows[0].id);
+        return res.status(401).json({ erro: 'Codigo de verificacao invalido.' });
+      }
+    }
 
     const token = emitirSessao(req, res, rows[0]);
+    await registrarAuditoria({ ...req, usuario: rows[0] }, 'auth.login_sucesso', 'usuario', rows[0].id);
     res.json({ token, usuario: montarUsuarioPublico(rows[0]) });
   } catch (err) {
     erroInterno(res, err);
@@ -514,7 +716,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT u.id, u.nome, u.email, u.papel, u.empresa_id, e.nome AS empresa_nome
+      SELECT u.id, u.nome, u.email, u.papel, u.empresa_id, u.precisa_trocar_senha, u.permissoes, u.mfa_ativo, e.nome AS empresa_nome
       FROM usuarios u
       JOIN empresas e ON e.id = u.empresa_id
       WHERE u.id=$1 AND u.empresa_id=$2
@@ -526,8 +728,82 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/auth/trocar-senha', authMiddleware, async (req, res) => {
+  try {
+    const { senha_atual, nova_senha } = req.body;
+    if (!nova_senha || nova_senha.length < 8) {
+      return res.status(400).json({ erro: 'A nova senha deve ter pelo menos 8 caracteres.' });
+    }
+
+    const { rows } = await pool.query('SELECT senha_hash FROM usuarios WHERE id=$1 AND empresa_id=$2', [req.usuario.id, empresaId(req)]);
+    if (!rows.length) return res.status(404).json({ erro: 'Usuario nao encontrado.' });
+
+    if (senha_atual) {
+      const atualOk = await bcrypt.compare(senha_atual, rows[0].senha_hash);
+      if (!atualOk) return res.status(401).json({ erro: 'Senha atual incorreta.' });
+    }
+
+    const senha_hash = await bcrypt.hash(nova_senha, 12);
+    await pool.query(
+      'UPDATE usuarios SET senha_hash=$1, precisa_trocar_senha=FALSE, senha_alterada_em=NOW() WHERE id=$2 AND empresa_id=$3',
+      [senha_hash, req.usuario.id, empresaId(req)]
+    );
+    await registrarAuditoria(req, 'auth.senha_alterada', 'usuario', req.usuario.id);
+    res.json({ mensagem: 'Senha alterada com sucesso.' });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.get('/api/auth/2fa/status', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT mfa_ativo FROM usuarios WHERE id=$1', [req.usuario.id]);
+    res.json({ mfa_ativo: rows[0]?.mfa_ativo === true });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.post('/api/auth/2fa/setup', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const secret = gerarBase32();
+    await pool.query('UPDATE usuarios SET mfa_secret=$1, mfa_ativo=FALSE WHERE id=$2', [criptografarTexto(secret), req.usuario.id]);
+    await registrarAuditoria(req, 'auth.2fa_setup', 'usuario', req.usuario.id);
+    const label = encodeURIComponent(`TáAtendido:${req.usuario.email}`);
+    const issuer = encodeURIComponent('TáAtendido');
+    res.json({
+      secret,
+      otpauth_url: `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`,
+    });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.post('/api/auth/2fa/ativar', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const { codigo } = req.body;
+    const { rows } = await pool.query('SELECT mfa_secret FROM usuarios WHERE id=$1', [req.usuario.id]);
+    const secret = descriptografarTexto(rows[0]?.mfa_secret);
+    if (!secret) return res.status(400).json({ erro: 'Configure o 2FA primeiro.' });
+    if (!validarTotp(secret, codigo)) return res.status(400).json({ erro: 'Codigo invalido.' });
+    await pool.query('UPDATE usuarios SET mfa_ativo=TRUE WHERE id=$1', [req.usuario.id]);
+    await registrarAuditoria(req, 'auth.2fa_ativado', 'usuario', req.usuario.id);
+    res.json({ mensagem: '2FA ativado.' });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
 // ── Contatos ──────────────────────────────────────────────
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || cookieValor(req, 'ta_session');
+    if (token) {
+      const payload = jwt.verify(token, JWT_SECRET);
+      await registrarAuditoria({ ...req, usuario: payload }, 'auth.logout', 'usuario', payload.id);
+    }
+  } catch {}
   limparSessao(req, res);
   res.json({ mensagem: 'Sessao encerrada.' });
 });
@@ -552,7 +828,7 @@ app.get('/api/admin/empresas', authMiddleware, exigirSuperAdmin, async (req, res
       GROUP BY e.id
       ORDER BY e.criado_em DESC
     `);
-    res.json(rows);
+    res.json(rows.map(row => descriptografarLinha(row, ['conteudo'])));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -564,7 +840,7 @@ app.get('/api/admin/empresas/:id/usuarios', authMiddleware, exigirSuperAdmin, as
     if (!id) return res.status(400).json({ erro: 'ID invalido.' });
 
     const { rows } = await pool.query(
-      `SELECT id, nome, email, papel, criado_em
+      `SELECT id, nome, email, papel, criado_em, precisa_trocar_senha, permissoes, mfa_ativo
        FROM usuarios
        WHERE empresa_id=$1
        ORDER BY criado_em DESC`,
@@ -591,6 +867,7 @@ app.patch('/api/admin/empresas/:id/status', authMiddleware, exigirSuperAdmin, as
       [status, id]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Empresa nao encontrada.' });
+    await registrarAuditoria(req, 'admin.empresa_status', 'empresa', id, { status });
     res.json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
@@ -609,11 +886,29 @@ app.patch('/api/admin/usuarios/:id/senha', authMiddleware, exigirSuperAdmin, asy
 
     const senha_hash = await bcrypt.hash(senha, 12);
     const { rows } = await pool.query(
-      'UPDATE usuarios SET senha_hash=$1 WHERE id=$2 RETURNING id, nome, email, papel, empresa_id',
+      'UPDATE usuarios SET senha_hash=$1, precisa_trocar_senha=TRUE WHERE id=$2 RETURNING id, nome, email, papel, empresa_id',
       [senha_hash, id]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Usuario nao encontrado.' });
+    await registrarAuditoria(req, 'admin.usuario_reset_senha', 'usuario', id);
     res.json({ mensagem: 'Senha atualizada.', usuario: rows[0] });
+  } catch (err) {
+    erroInterno(res, err);
+  }
+});
+
+app.get('/api/admin/auditoria', authMiddleware, exigirSuperAdmin, async (req, res) => {
+  try {
+    const limite = Math.min(parseInt(req.query.limite) || 100, 300);
+    const { rows } = await pool.query(`
+      SELECT a.*, u.email AS usuario_email, e.nome AS empresa_nome
+      FROM auditoria a
+      LEFT JOIN usuarios u ON u.id = a.usuario_id
+      LEFT JOIN empresas e ON e.id = a.empresa_id
+      ORDER BY a.criado_em DESC
+      LIMIT $1
+    `, [limite]);
+    res.json(rows);
   } catch (err) {
     erroInterno(res, err);
   }
@@ -626,7 +921,7 @@ app.get('/api/contatos', authMiddleware, async (req, res) => {
       'SELECT * FROM contatos WHERE empresa_id=$1 ORDER BY criado_em DESC LIMIT $2',
       [empresaId(req), limite]
     );
-    res.json(rows);
+    res.json(rows.map(row => descriptografarLinha(row, ['telefone'])));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -637,10 +932,11 @@ app.post('/api/contatos', authMiddleware, async (req, res) => {
     const { nome, telefone, segmento } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
     const { rows } = await pool.query(
-      'INSERT INTO contatos (empresa_id, nome, telefone, segmento) VALUES ($1, $2, $3, $4) RETURNING *',
-      [empresaId(req), nome.trim(), telefone?.trim(), segmento?.trim()]
+      'INSERT INTO contatos (empresa_id, nome, telefone, telefone_hash, segmento) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [empresaId(req), nome.trim(), criptografarTexto(telefone?.trim()), hashDado(telefone), segmento?.trim()]
     );
-    res.status(201).json(rows[0]);
+    await registrarAuditoria(req, 'contato.criado', 'contato', rows[0].id);
+    res.status(201).json(descriptografarLinha(rows[0], ['telefone']));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -658,7 +954,7 @@ app.get('/api/conversas', authMiddleware, async (req, res) => {
       ORDER BY c.atualizado_em DESC
       LIMIT $2
     `, [empresaId(req), limite]);
-    res.json(rows);
+    res.json(rows.map(row => descriptografarLinha(row, ['contato_telefone'])));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -742,10 +1038,10 @@ app.post('/api/conversas/:id/mensagens', authMiddleware, async (req, res) => {
 
     const { rows } = await pool.query(
       'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1, $2, $3, $4) RETURNING *',
-      [empresaId(req), id, tipoFinal, conteudo.trim()]
+      [empresaId(req), id, tipoFinal, criptografarTexto(conteudo.trim())]
     );
     await pool.query('UPDATE conversas SET atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
-    res.status(201).json(rows[0]);
+    res.status(201).json(descriptografarLinha(rows[0], ['conteudo']));
   } catch (err) {
     erroInterno(res, err);
   }
@@ -764,7 +1060,7 @@ app.get('/api/respostas', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/respostas', authMiddleware, exigirAdmin, async (req, res) => {
+app.post('/api/respostas', authMiddleware, exigirPermissao('respostas.gerenciar'), async (req, res) => {
   try {
     const { titulo, categoria, mensagem } = req.body;
     if (!titulo || !mensagem) return res.status(400).json({ erro: 'Título e mensagem são obrigatórios.' });
@@ -772,19 +1068,21 @@ app.post('/api/respostas', authMiddleware, exigirAdmin, async (req, res) => {
       'INSERT INTO respostas_rapidas (empresa_id, titulo, categoria, mensagem) VALUES ($1, $2, $3, $4) RETURNING *',
       [empresaId(req), titulo.trim(), categoria?.trim(), mensagem.trim()]
     );
+    await registrarAuditoria(req, 'resposta.criada', 'resposta', rows[0].id);
     res.status(201).json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }
 });
 
-app.delete('/api/respostas/:id', authMiddleware, exigirAdmin, async (req, res) => {
+app.delete('/api/respostas/:id', authMiddleware, exigirPermissao('respostas.gerenciar'), async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
 
     const result = await pool.query('DELETE FROM respostas_rapidas WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Resposta não encontrada.' });
+    await registrarAuditoria(req, 'resposta.removida', 'resposta', id);
     res.json({ mensagem: 'Resposta removida.' });
   } catch (err) {
     erroInterno(res, err);
@@ -806,7 +1104,7 @@ app.get('/api/empresa/config', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/empresa/config', authMiddleware, exigirAdmin, async (req, res) => {
+app.post('/api/empresa/config', authMiddleware, exigirPermissao('empresa.configurar'), async (req, res) => {
   try {
     const permitidas = [
       'nome_empresa','segmento','whatsapp','email',
@@ -832,6 +1130,7 @@ app.post('/api/empresa/config', authMiddleware, exigirAdmin, async (req, res) =>
         [String(req.body.nome_empresa).trim().slice(0, 200), empresaId(req)]
       );
     }
+    await registrarAuditoria(req, 'empresa.config_atualizada', 'empresa', empresaId(req), { campos: entries.map(([chave]) => chave) });
     res.json({ mensagem: 'Configurações salvas.' });
   } catch (err) {
     erroInterno(res, err);
@@ -859,7 +1158,7 @@ function detectarImagem(buffer) {
   return null;
 }
 
-app.post('/api/upload/foto', authMiddleware, exigirAdmin, upload.single('foto'), async (req, res) => {
+app.post('/api/upload/foto', authMiddleware, exigirPermissao('produtos.gerenciar'), upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
   try {
     const imagem = detectarImagem(req.file.buffer);
@@ -876,6 +1175,7 @@ app.post('/api/upload/foto', authMiddleware, exigirAdmin, upload.single('foto'),
     const foto = await Jimp.read(req.file.buffer);
     foto.scaleToFit(1600, 1600).quality(82);
     await foto.writeAsync(destino);
+    await registrarAuditoria(req, 'upload.foto', 'arquivo', nome, { mimetype: req.file.mimetype, bytes: req.file.size });
     res.json({ url: `/uploads/${nome}` });
   } catch (err) {
     console.error('[upload/foto]', err);
@@ -896,7 +1196,7 @@ app.get('/api/produtos', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/produtos', authMiddleware, exigirAdmin, async (req, res) => {
+app.post('/api/produtos', authMiddleware, exigirPermissao('produtos.gerenciar'), async (req, res) => {
   try {
     const { nome, descricao, preco, categoria, foto_url } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
@@ -907,13 +1207,14 @@ app.post('/api/produtos', authMiddleware, exigirAdmin, async (req, res) => {
       'INSERT INTO produtos (empresa_id, nome, descricao, preco, categoria, foto_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [empresaId(req), nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), fotoFinal]
     );
+    await registrarAuditoria(req, 'produto.criado', 'produto', rows[0].id);
     res.status(201).json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }
 });
 
-app.patch('/api/produtos/:id', authMiddleware, exigirAdmin, async (req, res) => {
+app.patch('/api/produtos/:id', authMiddleware, exigirPermissao('produtos.gerenciar'), async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -926,13 +1227,14 @@ app.patch('/api/produtos/:id', authMiddleware, exigirAdmin, async (req, res) => 
       [nome.trim().slice(0, 200), descricao?.trim().slice(0, 500), precoNum, categoria?.trim().slice(0, 100), id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    await registrarAuditoria(req, 'produto.atualizado', 'produto', id);
     res.json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }
 });
 
-app.patch('/api/produtos/:id/foto', authMiddleware, exigirAdmin, async (req, res) => {
+app.patch('/api/produtos/:id/foto', authMiddleware, exigirPermissao('produtos.gerenciar'), async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -943,13 +1245,14 @@ app.patch('/api/produtos/:id/foto', authMiddleware, exigirAdmin, async (req, res
       [fotoFinal, id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    await registrarAuditoria(req, 'produto.foto_atualizada', 'produto', id);
     res.json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }
 });
 
-app.patch('/api/produtos/:id/disponivel', authMiddleware, exigirAdmin, async (req, res) => {
+app.patch('/api/produtos/:id/disponivel', authMiddleware, exigirPermissao('produtos.gerenciar'), async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
@@ -959,18 +1262,20 @@ app.patch('/api/produtos/:id/disponivel', authMiddleware, exigirAdmin, async (re
       [!!disponivel, id, empresaId(req)]
     );
     if (!rows.length) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    await registrarAuditoria(req, 'produto.disponibilidade', 'produto', id, { disponivel: !!disponivel });
     res.json(rows[0]);
   } catch (err) {
     erroInterno(res, err);
   }
 });
 
-app.delete('/api/produtos/:id', authMiddleware, exigirAdmin, async (req, res) => {
+app.delete('/api/produtos/:id', authMiddleware, exigirPermissao('produtos.gerenciar'), async (req, res) => {
   try {
     const id = validarId(req.params.id);
     if (!id) return res.status(400).json({ erro: 'ID inválido.' });
     const result = await pool.query('DELETE FROM produtos WHERE id=$1 AND empresa_id=$2', [id, empresaId(req)]);
     if (result.rowCount === 0) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    await registrarAuditoria(req, 'produto.removido', 'produto', id);
     res.json({ mensagem: 'Produto removido.' });
   } catch (err) {
     erroInterno(res, err);
@@ -1017,7 +1322,7 @@ app.post('/api/agente/responder', authMiddleware, async (req, res) => {
 
     const resposta = await agente.responder({
       mensagem: mensagem.trim(),
-      historico: historico.reverse(),
+      historico: historico.map(row => descriptografarLinha(row, ['conteudo'])).reverse(),
       config,
       produtos,
     });
@@ -1146,12 +1451,13 @@ async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
   if (!empresa_id) throw new Error('Empresa nao identificada para o atendimento.');
   // 1. Buscar ou criar contato
   let { rows: [contato] } = await pool.query(
-    'SELECT id FROM contatos WHERE empresa_id=$1 AND telefone=$2 LIMIT 1', [empresa_id, telefone]
+    'SELECT id FROM contatos WHERE empresa_id=$1 AND (telefone_hash=$2 OR telefone=$3) LIMIT 1',
+    [empresa_id, hashDado(telefone), telefone]
   );
   if (!contato) {
     const ins = await pool.query(
-      'INSERT INTO contatos (empresa_id, nome, telefone) VALUES ($1,$2,$3) RETURNING id',
-      [empresa_id, nome, telefone]
+      'INSERT INTO contatos (empresa_id, nome, telefone, telefone_hash) VALUES ($1,$2,$3,$4) RETURNING id',
+      [empresa_id, nome, criptografarTexto(telefone), hashDado(telefone)]
     );
     contato = ins.rows[0];
   }
@@ -1174,7 +1480,7 @@ async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
   // 3. Salvar mensagem recebida
   await pool.query(
     'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1,$2,$3,$4)',
-    [empresa_id, conversa.id, 'received', texto]
+    [empresa_id, conversa.id, 'received', criptografarTexto(texto)]
   );
 
   // 4. Buscar histórico
@@ -1182,6 +1488,7 @@ async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
     'SELECT tipo, conteudo FROM mensagens WHERE empresa_id=$1 AND conversa_id=$2 ORDER BY criado_em ASC',
     [empresa_id, conversa.id]
   );
+  const historicoClaro = historico.map(row => descriptografarLinha(row, ['conteudo']));
 
   // 5. Buscar config e produtos
   const { rows: configRows } = await pool.query(
@@ -1197,12 +1504,12 @@ async function processarMensagem({ empresa_id, telefone, nome, texto, canal }) {
   );
 
   // 6. Chamar IA
-  const resposta = await agente.responder({ mensagem: texto, historico, config, produtos });
+  const resposta = await agente.responder({ mensagem: texto, historico: historicoClaro, config, produtos });
 
   // 7. Salvar resposta
   await pool.query(
     'INSERT INTO mensagens (empresa_id, conversa_id, tipo, conteudo) VALUES ($1,$2,$3,$4)',
-    [empresa_id, conversa.id, 'sent', resposta.texto]
+    [empresa_id, conversa.id, 'sent', criptografarTexto(resposta.texto)]
   );
 
   // 8. Atualizar status da conversa
@@ -1312,6 +1619,8 @@ app.listen(PORT, async () => {
   if (process.env.DATABASE_URL) {
     try {
       await initDB();
+      await aplicarRetencaoDados();
+      setInterval(aplicarRetencaoDados, 24 * 60 * 60 * 1000);
     } catch (err) {
       console.error('Erro ao inicializar banco:', err.message);
     }

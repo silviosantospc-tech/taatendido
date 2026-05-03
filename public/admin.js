@@ -8,6 +8,13 @@ const els = {
   usuariosTitulo: document.getElementById('usuariosTitulo'),
   usuariosTbody: document.getElementById('usuariosTbody'),
   btnAtualizar: document.getElementById('btnAtualizar'),
+  auditoriaTbody: document.getElementById('auditoriaTbody'),
+  btnAuditoria: document.getElementById('btnAuditoria'),
+  btnSetup2fa: document.getElementById('btnSetup2fa'),
+  btnAtivar2fa: document.getElementById('btnAtivar2fa'),
+  mfaSetup: document.getElementById('mfaSetup'),
+  mfaSecret: document.getElementById('mfaSecret'),
+  mfaCodigo: document.getElementById('mfaCodigo'),
 };
 
 let empresas = [];
@@ -135,7 +142,7 @@ async function carregarUsuarios(id) {
         <td><strong>${escapar(usuario.nome)}</strong></td>
         <td>${escapar(usuario.email)}</td>
         <td>${usuario.papel === 'admin' ? 'Administrador' : 'Atendente'}</td>
-        <td class="td-muted">${formatarData(usuario.criado_em)}</td>
+        <td class="td-muted">${formatarData(usuario.criado_em)}${usuario.precisa_trocar_senha ? '<br><span class="tag-amber">Troca pendente</span>' : ''}</td>
         <td><button class="secondary-button" type="button" data-action="senha" data-id="${usuario.id}">Resetar senha</button></td>
       </tr>
     `).join('');
@@ -143,6 +150,64 @@ async function carregarUsuarios(id) {
     console.error(err);
     els.usuariosTbody.innerHTML = '<tr><td colspan="5" class="td-muted">Não foi possível carregar os usuários.</td></tr>';
     avisar('Não foi possível carregar os usuários.', 'error');
+  }
+}
+
+async function carregarAuditoria() {
+  try {
+    const res = await Auth.fetch('/api/admin/auditoria?limite=80');
+    if (!res) return;
+    if (!res.ok) throw new Error('Falha ao carregar auditoria.');
+    const eventos = await res.json();
+
+    if (!eventos.length) {
+      els.auditoriaTbody.innerHTML = '<tr><td colspan="5" class="td-muted">Nenhum evento registrado.</td></tr>';
+      return;
+    }
+
+    els.auditoriaTbody.innerHTML = eventos.map(evento => `
+      <tr>
+        <td class="td-muted">${formatarData(evento.criado_em)}</td>
+        <td><strong>${escapar(evento.acao)}</strong></td>
+        <td>${escapar(evento.empresa_nome || '-')}</td>
+        <td>${escapar(evento.usuario_email || '-')}</td>
+        <td class="td-muted">${escapar(evento.ip || '-')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error(err);
+    els.auditoriaTbody.innerHTML = '<tr><td colspan="5" class="td-muted">Não foi possível carregar a auditoria.</td></tr>';
+  }
+}
+
+async function configurar2fa() {
+  try {
+    const res = await Auth.fetch('/api/auth/2fa/setup', { method: 'POST' });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.erro || 'Falha ao configurar 2FA.');
+    els.mfaSetup.hidden = false;
+    els.mfaSecret.textContent = data.secret;
+    avisar('Chave 2FA gerada. Cadastre no app autenticador.');
+  } catch (err) {
+    avisar(err.message || 'Não foi possível configurar 2FA.', 'error');
+  }
+}
+
+async function ativar2fa() {
+  try {
+    const codigo = els.mfaCodigo.value.trim();
+    const res = await Auth.fetch('/api/auth/2fa/ativar', {
+      method: 'POST',
+      body: JSON.stringify({ codigo }),
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.erro || 'Falha ao ativar 2FA.');
+    els.mfaSetup.hidden = true;
+    avisar('2FA ativado para o super admin.');
+  } catch (err) {
+    avisar(err.message || 'Não foi possível ativar 2FA.', 'error');
   }
 }
 
@@ -193,6 +258,9 @@ async function resetarSenhaUsuario(id) {
 }
 
 els.btnAtualizar?.addEventListener('click', carregarEmpresas);
+els.btnAuditoria?.addEventListener('click', carregarAuditoria);
+els.btnSetup2fa?.addEventListener('click', configurar2fa);
+els.btnAtivar2fa?.addEventListener('click', ativar2fa);
 
 els.empresasTbody?.addEventListener('click', (event) => {
   const botao = event.target.closest('button[data-action]');
@@ -208,3 +276,4 @@ els.usuariosTbody?.addEventListener('click', (event) => {
 });
 
 carregarEmpresas();
+carregarAuditoria();

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trocar senha - TáAtendido</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="login.css">
+  <script src="auth-guard.js"></script>
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-panel">
+      <div class="login-inner">
+        <a class="login-brand" href="painel.html">
+          <img src="assets/Táatendido.png" alt="TáAtendido">
+        </a>
+        <div class="login-copy">
+          <span class="eyebrow">Segurança da conta</span>
+          <h1>Defina uma nova senha</h1>
+          <p>Esta troca é obrigatória quando uma senha temporária foi gerada pelo suporte.</p>
+        </div>
+        <form class="login-form" id="trocarSenhaForm">
+          <label>
+            <span>Nova senha</span>
+            <div class="password-field">
+              <input id="novaSenha" type="password" autocomplete="new-password" required minlength="8">
+            </div>
+          </label>
+          <label>
+            <span>Confirmar nova senha</span>
+            <div class="password-field">
+              <input id="confirmarSenha" type="password" autocomplete="new-password" required minlength="8">
+            </div>
+          </label>
+          <button type="submit" class="login-button">Salvar nova senha</button>
+        </form>
+      </div>
+    </section>
+  </main>
+  <script src="auth.js"></script>
+  <script src="trocar-senha.js"></script>
+</body>
+</html>

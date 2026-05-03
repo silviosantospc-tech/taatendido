@@ -44,6 +44,16 @@ const Auth = {
       this.logout();
       return null;
     }
+    if (res.status === 403) {
+      try {
+        const clone = res.clone();
+        const data = await clone.json();
+        if (data?.troca_senha_obrigatoria && !location.pathname.endsWith('/trocar-senha.html')) {
+          window.location.href = 'trocar-senha.html';
+          return null;
+        }
+      } catch {}
+    }
     return res;
   },
 

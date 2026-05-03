@@ -128,6 +128,51 @@
           </table>
         </div>
       </section>
+
+      <section class="form-card wide-card">
+        <div class="analytics-head compact">
+          <div>
+            <h2>Segurança do super admin</h2>
+            <p>Ative 2FA com um aplicativo autenticador e acompanhe eventos sensíveis.</p>
+          </div>
+          <button class="secondary-button" type="button" id="btnSetup2fa">Configurar 2FA</button>
+        </div>
+        <div id="mfaSetup" hidden>
+          <p class="td-muted">Adicione esta chave no Google Authenticator, Microsoft Authenticator ou app compatível:</p>
+          <p><strong id="mfaSecret"></strong></p>
+          <label class="field">
+            <span>Código gerado</span>
+            <input id="mfaCodigo" type="text" inputmode="numeric" maxlength="6" placeholder="123456">
+          </label>
+          <button class="primary-button" type="button" id="btnAtivar2fa">Ativar 2FA</button>
+        </div>
+      </section>
+
+      <section class="form-card wide-card">
+        <div class="analytics-head compact">
+          <div>
+            <h2>Auditoria recente</h2>
+            <p>Log de acessos, alterações e bloqueios relevantes.</p>
+          </div>
+          <button class="secondary-button" type="button" id="btnAuditoria">Atualizar auditoria</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Ação</th>
+                <th>Empresa</th>
+                <th>Usuário</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody id="auditoriaTbody">
+              <tr><td colspan="5" class="td-muted">Carregando auditoria...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
   <script src="toast.js"></script>
